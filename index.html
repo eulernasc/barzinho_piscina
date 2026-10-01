@@ -13,109 +13,51 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-logo-wrap"><img src="assets/logo.svg" alt="Barzinho da Piscina"></div>
-        <div class="brand-copy">
-          <strong>Barzinho da Piscina</strong>
-          <span>Praça de Esportes</span>
-        </div>
+        <div class="brand-copy"><strong>Barzinho da Piscina</strong><span>Praça de Esportes</span></div>
       </div>
 
       <div class="nav-label">Navegação</div>
       <nav>
-        <button class="nav-btn active" data-view="pdv">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16v18l-2.5-1.5L15 21l-3-1.5L9 21l-2.5-1.5L4 21V3Zm4 5h8M8 12h8M8 16h5"/></svg>
-          <span>PDV</span>
-        </button>
-        <button class="nav-btn" data-view="produtos">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Zm8 4v10l-8 4-8-4V7m8 4v10"/></svg>
-          <span>Produtos</span>
-        </button>
-        <button class="nav-btn" data-view="estoque">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10m7 10V4m7 16v-7M3 20h18"/></svg>
-          <span>Estoque</span>
-        </button>
-        <button class="nav-btn" data-view="financeiro">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20m5-16H9.5A3.5 3.5 0 0 0 6 9.5C6 12 8 13 12 13s6 1 6 3.5A3.5 3.5 0 0 1 14.5 20H7"/></svg>
-          <span>Financeiro</span>
-        </button>
-        <button class="nav-btn" data-view="historico">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-3v7l4 2"/></svg>
-          <span>Histórico</span>
-        </button>
+        <button class="nav-btn active" data-view="pdv"><svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-3-1.5L9 21l-2.5-1.5L4 21V3Zm4 5h8M8 12h8M8 16h5"/></svg><span>PDV</span></button>
+        <button class="nav-btn" data-view="produtos"><svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4Zm8 4v10l-8 4-8-4V7m8 4v10"/></svg><span>Produtos</span></button>
+        <button class="nav-btn" data-view="estoque"><svg viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7M3 20h18"/></svg><span>Estoque</span></button>
+        <button class="nav-btn" data-view="financeiro"><svg viewBox="0 0 24 24"><path d="M12 2v20m5-16H9.5A3.5 3.5 0 0 0 6 9.5C6 12 8 13 12 13s6 1 6 3.5A3.5 3.5 0 0 1 14.5 20H7"/></svg><span>Financeiro</span></button>
+        <button class="nav-btn" data-view="historico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-3v7l4 2"/></svg><span>Histórico</span></button>
       </nav>
 
-      <div class="sidebar-card">
-        <span class="status-dot"></span>
-        <div><strong>Sistema ativo</strong><small>Versão inicial · dados locais</small></div>
-      </div>
+      <div class="sidebar-card"><span class="status-dot"></span><div><strong>Sistema ativo</strong><small>Versão inicial · dados locais</small></div></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div>
-          <span class="eyebrow">Operação do bar</span>
-          <h1 id="viewTitle">PDV</h1>
-          <p id="viewSubtitle">Venda rápida no balcão e emissão de fichas.</p>
-        </div>
-        <div class="top-actions">
-          <div class="date-pill">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3m10-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
-            <span id="clock"></span>
-          </div>
-          <button id="seedBtn" class="secondary">Carregar exemplo</button>
-        </div>
+        <div><span class="eyebrow">Operação do bar</span><h1 id="viewTitle">PDV</h1><p id="viewSubtitle">Venda rápida no balcão e emissão de fichas individuais.</p></div>
+        <div class="top-actions"><div class="date-pill"><svg viewBox="0 0 24 24"><path d="M7 2v3m10-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg><span id="clock"></span></div><button id="seedBtn" class="secondary">Carregar exemplo</button></div>
       </header>
 
       <section id="view-pdv" class="view active-view">
         <div class="pdv-overview">
-          <div class="overview-card accent-blue">
-            <div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg></div>
-            <div><span>Atendimento</span><strong>Venda no balcão</strong></div>
-          </div>
-          <div class="overview-card accent-cyan">
-            <div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v5H5zM7 9v11m10-11v11M5 14h14"/></svg></div>
-            <div><span>Fichas</span><strong>Impressão rápida</strong></div>
-          </div>
-          <div class="overview-card accent-gold">
-            <div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18m4-15H9.5A3.5 3.5 0 0 0 6 9.5C6 12 8 13 12 13s6 1 6 3.5A3.5 3.5 0 0 1 14.5 20H8"/></svg></div>
-            <div><span>Controle</span><strong>Venda + custo</strong></div>
-          </div>
+          <div class="overview-card accent-blue"><div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg></div><div><span>Atendimento</span><strong>Venda no balcão</strong></div></div>
+          <div class="overview-card accent-cyan"><div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v5H5zM7 9v11m10-11v11M5 14h14"/></svg></div><div><span>Fichas</span><strong>Uma por produto</strong></div></div>
+          <div class="overview-card accent-gold"><div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18m4-15H9.5A3.5 3.5 0 0 0 6 9.5C6 12 8 13 12 13s6 1 6 3.5A3.5 3.5 0 0 1 14.5 20H8"/></svg></div><div><span>Controle</span><strong>Venda + custo</strong></div></div>
         </div>
 
         <div class="pdv-grid">
           <section class="catalog-panel">
-            <div class="panel-heading">
-              <div><span class="mini-label">Catálogo</span><h2>O que vai sair agora?</h2></div>
-              <span class="panel-chip">Toque para adicionar</span>
-            </div>
-            <div class="toolbar">
-              <div class="search-wrap">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
-                <input id="searchProduct" placeholder="Buscar produto...">
-              </div>
-              <select id="categoryFilter"><option value="">Todas as categorias</option></select>
-            </div>
+            <div class="panel-heading"><div><span class="mini-label">Catálogo</span><h2>O que o cliente vai levar?</h2></div><span class="panel-chip">Agora ou em ficha</span></div>
+            <div class="toolbar"><div class="search-wrap"><svg viewBox="0 0 24 24"><path d="m21 21-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg><input id="searchProduct" placeholder="Buscar produto..."></div><select id="categoryFilter"><option value="">Todas as categorias</option></select></div>
             <div id="productGrid" class="product-grid"></div>
-            <div class="catalog-empty-art" aria-hidden="true">
-              <span class="bubble b1"></span><span class="bubble b2"></span><span class="wave-line w1"></span><span class="wave-line w2"></span>
-            </div>
+            <div class="catalog-empty-art" aria-hidden="true"><span class="bubble b1"></span><span class="bubble b2"></span><span class="wave-line w1"></span><span class="wave-line w2"></span></div>
           </section>
 
           <aside class="cart-panel">
-            <div class="cart-head">
-              <div><span class="mini-label">Comanda</span><h2>Pedido atual</h2></div>
-              <button id="clearCart" class="link-btn">Limpar</button>
-            </div>
+            <div class="cart-head"><div><span class="mini-label">Comanda</span><h2>Pedido atual</h2></div><button id="clearCart" class="link-btn">Limpar</button></div>
             <div id="cartItems" class="cart-items"></div>
-
-            <div class="sale-mode">
-              <label><span>Tipo de entrega</span><select id="saleMode"><option value="imediato">Entregar agora</option><option value="fichas">Emitir fichas</option></select></label>
-              <label><span>Pagamento</span><select id="paymentMethod"><option value="Dinheiro">Dinheiro</option><option value="PIX">PIX</option><option value="Débito">Débito</option><option value="Crédito">Crédito</option></select></label>
-            </div>
-
+            <div class="ticket-counter"><div><span>Fichas a imprimir</span><strong id="tokenCount">0</strong></div><small>Cada unidade vira uma ficha destacável.</small></div>
+            <div class="sale-mode"><label><span>Pagamento</span><select id="paymentMethod"><option value="Dinheiro">Dinheiro</option><option value="PIX">PIX</option><option value="Débito">Débito</option><option value="Crédito">Crédito</option></select></label></div>
             <div class="cart-summary-line"><span>Subtotal</span><strong id="cartSubtotal">R$ 0,00</strong></div>
             <div class="cart-total"><span>Total</span><strong id="cartTotal">R$ 0,00</strong></div>
             <button id="finishSale" class="primary big">Concluir pedido</button>
-            <div class="cart-foot-note"><span class="tiny-dot"></span> A impressão será preparada para a térmica do caixa.</div>
+            <div class="cart-foot-note"><span class="tiny-dot"></span> Fichas serão impressas separadas para destacar e usar depois.</div>
           </aside>
         </div>
       </section>
@@ -126,31 +68,30 @@
       </section>
 
       <section id="view-estoque" class="view">
+        <div class="section-head"><div><span class="mini-label">Controle físico</span><h2>Estoque atual</h2><p>Ajuste quantidades e acompanhe valor parado.</p></div></div>
         <div class="stats-grid"><div class="stat-card"><span>Itens cadastrados</span><strong id="stockItems">0</strong></div><div class="stat-card"><span>Custo em estoque</span><strong id="stockCost">R$ 0,00</strong></div><div class="stat-card"><span>Venda potencial</span><strong id="stockRevenue">R$ 0,00</strong></div><div class="stat-card danger"><span>Estoque baixo</span><strong id="lowStock">0</strong></div></div>
         <div id="stockTableWrap" class="table-card"></div>
       </section>
 
       <section id="view-financeiro" class="view">
-        <div class="stats-grid"><div class="stat-card"><span>Faturamento</span><strong id="revenue">R$ 0,00</strong></div><div class="stat-card"><span>Custo das vendas</span><strong id="cogs">R$ 0,00</strong></div><div class="stat-card"><span>Lucro bruto</span><strong id="grossProfit">R$ 0,00</strong></div><div class="stat-card"><span>Margem</span><strong id="margin">0%</strong></div></div>
+        <div class="section-head"><div><span class="mini-label">Caixa e compras</span><h2>Financeiro</h2><p>Vendas, custos, compras de estoque, entradas e saídas.</p></div><button id="newPurchaseBtn" class="primary">+ Registrar compra</button></div>
+        <div class="stats-grid finance-stats"><div class="stat-card"><span>Faturamento</span><strong id="revenue">R$ 0,00</strong></div><div class="stat-card"><span>Custo das vendas</span><strong id="cogs">R$ 0,00</strong></div><div class="stat-card"><span>Compras de estoque</span><strong id="purchasesTotal">R$ 0,00</strong></div><div class="stat-card"><span>Lucro bruto</span><strong id="grossProfit">R$ 0,00</strong></div><div class="stat-card"><span>Margem</span><strong id="margin">0%</strong></div></div>
         <div class="two-col"><div class="table-card"><h3>Resumo por forma de pagamento</h3><div id="paymentSummary"></div></div><div class="table-card"><h3>Entradas e saídas</h3><div class="cash-form"><select id="movementType"><option value="entrada">Entrada</option><option value="saida">Saída</option></select><input id="movementDesc" placeholder="Descrição"><input id="movementValue" type="number" step="0.01" min="0" placeholder="Valor"><button id="addMovement" class="secondary">Registrar</button></div><div id="movementList"></div></div></div>
+        <div class="table-card purchases-card"><div class="table-title-row"><div><span class="mini-label">Compras</span><h3>Produtos comprados para o bar</h3></div><span class="panel-chip">Compra aumenta estoque e gera saída</span></div><div id="purchasesTableWrap"></div></div>
       </section>
 
       <section id="view-historico" class="view">
-        <div class="section-head"><div><span class="mini-label">Movimentação</span><h2>Histórico de vendas</h2><p>Pedidos concluídos e fichas emitidas.</p></div></div>
+        <div class="section-head"><div><span class="mini-label">Movimentação</span><h2>Histórico de vendas</h2><p>Pedidos concluídos, entregas imediatas e fichas emitidas.</p></div></div>
         <div id="salesTableWrap" class="table-card"></div>
       </section>
     </main>
   </div>
 
-  <dialog id="productDialog">
-    <form method="dialog" id="productForm">
-      <div class="dialog-head"><h2 id="productDialogTitle">Novo produto</h2><button value="cancel" class="icon-btn">✕</button></div>
-      <input type="hidden" id="productId">
-      <div class="form-grid"><label><span>Nome</span><input id="productName" required></label><label><span>Categoria</span><input id="productCategory" required placeholder="Ex.: Bebidas"></label><label><span>Preço de venda</span><input id="productPrice" type="number" step="0.01" min="0" required></label><label><span>Custo</span><input id="productCost" type="number" step="0.01" min="0" required></label><label><span>Estoque</span><input id="productStock" type="number" step="1" min="0" required></label><label><span>Estoque mínimo</span><input id="productMinStock" type="number" step="1" min="0" value="5" required></label></div>
-      <label class="check-row"><input id="productTrackStock" type="checkbox" checked> Controlar estoque</label>
-      <div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar</button></div>
-    </form>
-  </dialog>
+  <dialog id="productDialog"><form method="dialog" id="productForm"><div class="dialog-head"><h2 id="productDialogTitle">Novo produto</h2><button value="cancel" class="icon-btn">✕</button></div><input type="hidden" id="productId"><div class="form-grid"><label><span>Nome</span><input id="productName" required></label><label><span>Categoria</span><input id="productCategory" required placeholder="Ex.: Bebidas"></label><label><span>Preço de venda</span><input id="productPrice" type="number" step="0.01" min="0" required></label><label><span>Custo</span><input id="productCost" type="number" step="0.01" min="0" required></label><label><span>Estoque</span><input id="productStock" type="number" step="1" min="0" required></label><label><span>Estoque mínimo</span><input id="productMinStock" type="number" step="1" min="0" value="5" required></label></div><label class="check-row"><input id="productTrackStock" type="checkbox" checked> Controlar estoque</label><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar</button></div></form></dialog>
+
+  <dialog id="stockDialog"><form method="dialog" id="stockForm"><div class="dialog-head"><div><span class="mini-label">Ajuste manual</span><h2>Ajustar estoque</h2></div><button value="cancel" class="icon-btn">✕</button></div><input type="hidden" id="stockProductId"><div id="stockProductName" class="dialog-product-name"></div><div class="form-grid"><label><span>Estoque atual</span><input id="stockCurrent" disabled></label><label><span>Novo estoque</span><input id="stockNew" type="number" step="1" min="0" required></label><label class="full"><span>Motivo do ajuste</span><input id="stockReason" placeholder="Ex.: contagem física, perda, quebra..." required></label></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar ajuste</button></div></form></dialog>
+
+  <dialog id="purchaseDialog"><form method="dialog" id="purchaseForm"><div class="dialog-head"><div><span class="mini-label">Entrada de mercadoria</span><h2>Registrar compra</h2></div><button value="cancel" class="icon-btn">✕</button></div><div class="form-grid"><label><span>Fornecedor</span><input id="purchaseSupplier" placeholder="Nome do fornecedor"></label><label><span>Pagamento</span><select id="purchasePayment"><option>Dinheiro</option><option>PIX</option><option>Débito</option><option>Crédito</option><option>Boleto</option></select></label></div><div class="purchase-builder"><select id="purchaseProduct"></select><input id="purchaseQty" type="number" min="1" step="1" placeholder="Qtd."><input id="purchaseUnitCost" type="number" min="0" step="0.01" placeholder="Custo unit."><button type="button" id="addPurchaseItem" class="secondary">Adicionar item</button></div><div id="purchaseItems" class="purchase-items"></div><div class="purchase-total"><span>Total da compra</span><strong id="purchaseTotalPreview">R$ 0,00</strong></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar compra e dar entrada</button></div></form></dialog>
 
   <div id="toast" class="toast"></div>
   <div id="printArea" class="print-area"></div>
