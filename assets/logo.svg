@@ -1,1 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc"><title>Barzinho da Piscina</title><desc>Marca circular em azul e branco para o Barzinho da Piscina.</desc><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b67c8"/><stop offset="1" stop-color="#19aee0"/></linearGradient></defs><circle cx="256" cy="256" r="242" fill="#fff" stroke="#062f6b" stroke-width="18"/><path d="M76 194c62-26 119-21 178 3 67 27 117 25 182-2v45c-71 25-132 29-202 0-55-23-104-25-158-6z" fill="url(#g)"/><path d="M79 239c64-22 119-16 177 8 67 27 117 27 177 4v34c-66 20-128 22-198-5-57-22-106-24-156-8z" fill="#062f6b" opacity=".9"/><g transform="translate(130 86)"><rect x="24" y="34" width="82" height="100" rx="14" fill="#f7b321" stroke="#062f6b" stroke-width="9"/><rect x="112" y="34" width="82" height="100" rx="14" fill="#f7b321" stroke="#062f6b" stroke-width="9"/><path d="M106 61l20 12" stroke="#062f6b" stroke-width="10" stroke-linecap="round"/><path d="M42 35c8-22 46-20 54 0M131 35c8-22 46-20 54 0" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/></g><text x="256" y="342" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="54" font-weight="800" fill="#062f6b">BARZINHO</text><text x="256" y="391" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="35" font-weight="700" fill="#0b67c8">DA PISCINA</text><text x="256" y="430" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="#062f6b">PRAÇA DE ESPORTES</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Barzinho da Piscina</title>
+  <desc id="desc">Marca circular azul e branca com canecas, ondas e referência à piscina.</desc>
+  <defs>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#061f4d"/><stop offset="1" stop-color="#0a4c91"/>
+    </linearGradient>
+    <linearGradient id="aqua" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#008ee8"/><stop offset="1" stop-color="#1cc6ef"/>
+    </linearGradient>
+    <linearGradient id="beer" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffb21d"/><stop offset=".55" stop-color="#f28a00"/><stop offset="1" stop-color="#d96a00"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#001839" flood-opacity=".18"/>
+    </filter>
+  </defs>
+
+  <circle cx="320" cy="320" r="306" fill="#fff" stroke="#082b63" stroke-width="18"/>
+  <circle cx="320" cy="320" r="286" fill="none" stroke="#13aee1" stroke-width="8"/>
+
+  <path d="M35 238c89-42 165-44 250-9 90 38 176 39 320-10v62c-132 44-233 47-330 8-75-30-144-29-240 8z" fill="url(#aqua)" opacity=".97"/>
+  <path d="M35 285c94-36 169-34 250-1 98 40 184 38 320-5v55c-130 44-225 49-322 13-84-31-156-34-248 0z" fill="#083879" opacity=".98"/>
+  <path d="M39 337c89-30 159-25 239 6 97 38 184 40 322 0v45c-123 40-219 45-318 14-88-28-158-31-243-1z" fill="#12aee2"/>
+
+  <g transform="translate(155 80) rotate(-5 85 100)" filter="url(#shadow)">
+    <path d="M38 82h120v132c0 17-14 31-31 31H69c-17 0-31-14-31-31z" fill="url(#beer)" stroke="#082b63" stroke-width="10"/>
+    <path d="M159 111h25c31 0 52 23 52 51 0 31-22 52-53 52h-25" fill="none" stroke="#082b63" stroke-width="12"/>
+    <path d="M59 96v117M94 96v117M129 96v117" stroke="#ffd66f" stroke-width="8" opacity=".75"/>
+    <g fill="#fff" stroke="#082b63" stroke-width="8">
+      <circle cx="60" cy="73" r="30"/><circle cx="94" cy="61" r="34"/><circle cx="129" cy="71" r="31"/><circle cx="153" cy="87" r="23"/>
+    </g>
+  </g>
+
+  <g transform="translate(325 82) rotate(5 85 100)" filter="url(#shadow)">
+    <path d="M38 82h120v132c0 17-14 31-31 31H69c-17 0-31-14-31-31z" fill="url(#beer)" stroke="#082b63" stroke-width="10"/>
+    <path d="M36 111H11c-31 0-52 23-52 51 0 31 22 52 53 52h25" fill="none" stroke="#082b63" stroke-width="12"/>
+    <path d="M59 96v117M94 96v117M129 96v117" stroke="#ffd66f" stroke-width="8" opacity=".75"/>
+    <g fill="#fff" stroke="#082b63" stroke-width="8">
+      <circle cx="60" cy="73" r="30"/><circle cx="94" cy="61" r="34"/><circle cx="129" cy="71" r="31"/><circle cx="153" cy="87" r="23"/>
+    </g>
+  </g>
+
+  <path d="M292 82l28 24 27-26M319 65v-27" fill="none" stroke="#12aee2" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g transform="translate(433 185)" fill="#082b63">
+    <circle cx="57" cy="17" r="16"/>
+    <path d="M5 34c29-12 50-19 70-7 9 5 18 14 29 21-17-4-31-5-43-2-16 4-27 17-54 13 17-8 26-15 36-22-12 0-23 1-38-3z"/>
+  </g>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" text-anchor="middle">
+    <text x="320" y="455" font-size="74" font-weight="900" letter-spacing="1" fill="url(#navy)">BARZINHO</text>
+    <text x="320" y="510" font-size="45" font-weight="800" letter-spacing="6" fill="#0a72c9">DA PISCINA</text>
+    <path d="M118 535h104M418 535h104" stroke="#0d4e91" stroke-width="3" stroke-linecap="round"/>
+    <text x="320" y="545" font-size="17" font-weight="800" letter-spacing="5" fill="#082b63">PRAÇA DE ESPORTES</text>
+    <text x="320" y="579" font-size="15" font-weight="700" letter-spacing="4" fill="#12aee2">RIBEIRÃO VERMELHO • MG</text>
+  </g>
+</svg>
