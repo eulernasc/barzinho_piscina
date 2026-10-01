@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#062f6b">
+  <title>Barzinho da Piscina</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="assets/logo.svg" alt="Barzinho da Piscina">
+        <div>
+          <strong>Barzinho da Piscina</strong>
+          <span>Praça de Esportes</span>
+        </div>
+      </div>
+
+      <nav>
+        <button class="nav-btn active" data-view="pdv">🧾 PDV</button>
+        <button class="nav-btn" data-view="produtos">📦 Produtos</button>
+        <button class="nav-btn" data-view="estoque">📊 Estoque</button>
+        <button class="nav-btn" data-view="financeiro">💰 Financeiro</button>
+        <button class="nav-btn" data-view="historico">🕘 Histórico</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <span class="status-dot"></span>
+        <span>Versão inicial · dados locais</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="viewTitle">PDV</h1>
+          <p id="viewSubtitle">Venda rápida no balcão e emissão de fichas.</p>
+        </div>
+        <div class="top-actions">
+          <span id="clock"></span>
+          <button id="seedBtn" class="secondary">Carregar exemplo</button>
+        </div>
+      </header>
+
+      <section id="view-pdv" class="view active-view">
+        <div class="pdv-grid">
+          <section>
+            <div class="toolbar">
+              <input id="searchProduct" placeholder="Buscar produto...">
+              <select id="categoryFilter">
+                <option value="">Todas as categorias</option>
+              </select>
+            </div>
+            <div id="productGrid" class="product-grid"></div>
+          </section>
+
+          <aside class="cart-panel">
+            <div class="cart-head">
+              <h2>Pedido atual</h2>
+              <button id="clearCart" class="link-btn">Limpar</button>
+            </div>
+            <div id="cartItems" class="cart-items"></div>
+
+            <div class="sale-mode">
+              <label>
+                <span>Tipo de entrega</span>
+                <select id="saleMode">
+                  <option value="imediato">Entregar agora</option>
+                  <option value="fichas">Emitir fichas</option>
+                </select>
+              </label>
+              <label>
+                <span>Pagamento</span>
+                <select id="paymentMethod">
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Débito">Débito</option>
+                  <option value="Crédito">Crédito</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="cart-total">
+              <span>Total</span>
+              <strong id="cartTotal">R$ 0,00</strong>
+            </div>
+            <button id="finishSale" class="primary big">Concluir pedido</button>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-produtos" class="view">
+        <div class="section-head">
+          <div>
+            <h2>Produtos e pratos</h2>
+            <p>Cadastre preço de venda, custo e controle de estoque.</p>
+          </div>
+          <button id="newProductBtn" class="primary">+ Novo produto</button>
+        </div>
+        <div id="productsTableWrap" class="table-card"></div>
+      </section>
+
+      <section id="view-estoque" class="view">
+        <div class="stats-grid">
+          <div class="stat-card"><span>Itens cadastrados</span><strong id="stockItems">0</strong></div>
+          <div class="stat-card"><span>Custo em estoque</span><strong id="stockCost">R$ 0,00</strong></div>
+          <div class="stat-card"><span>Venda potencial</span><strong id="stockRevenue">R$ 0,00</strong></div>
+          <div class="stat-card danger"><span>Estoque baixo</span><strong id="lowStock">0</strong></div>
+        </div>
+        <div id="stockTableWrap" class="table-card"></div>
+      </section>
+
+      <section id="view-financeiro" class="view">
+        <div class="stats-grid">
+          <div class="stat-card"><span>Faturamento</span><strong id="revenue">R$ 0,00</strong></div>
+          <div class="stat-card"><span>Custo das vendas</span><strong id="cogs">R$ 0,00</strong></div>
+          <div class="stat-card"><span>Lucro bruto</span><strong id="grossProfit">R$ 0,00</strong></div>
+          <div class="stat-card"><span>Margem</span><strong id="margin">0%</strong></div>
+        </div>
+        <div class="two-col">
+          <div class="table-card">
+            <h3>Resumo por forma de pagamento</h3>
+            <div id="paymentSummary"></div>
+          </div>
+          <div class="table-card">
+            <h3>Entradas e saídas</h3>
+            <div class="cash-form">
+              <select id="movementType">
+                <option value="entrada">Entrada</option>
+                <option value="saida">Saída</option>
+              </select>
+              <input id="movementDesc" placeholder="Descrição">
+              <input id="movementValue" type="number" step="0.01" min="0" placeholder="Valor">
+              <button id="addMovement" class="secondary">Registrar</button>
+            </div>
+            <div id="movementList"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-historico" class="view">
+        <div class="section-head">
+          <div>
+            <h2>Histórico de vendas</h2>
+            <p>Pedidos concluídos e fichas emitidas.</p>
+          </div>
+        </div>
+        <div id="salesTableWrap" class="table-card"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="productDialog">
+    <form method="dialog" id="productForm">
+      <div class="dialog-head">
+        <h2 id="productDialogTitle">Novo produto</h2>
+        <button value="cancel" class="icon-btn">✕</button>
+      </div>
+      <input type="hidden" id="productId">
+      <div class="form-grid">
+        <label><span>Nome</span><input id="productName" required></label>
+        <label><span>Categoria</span><input id="productCategory" required placeholder="Ex.: Bebidas"></label>
+        <label><span>Preço de venda</span><input id="productPrice" type="number" step="0.01" min="0" required></label>
+        <label><span>Custo</span><input id="productCost" type="number" step="0.01" min="0" required></label>
+        <label><span>Estoque</span><input id="productStock" type="number" step="1" min="0" required></label>
+        <label><span>Estoque mínimo</span><input id="productMinStock" type="number" step="1" min="0" value="5" required></label>
+      </div>
+      <label class="check-row"><input id="productTrackStock" type="checkbox" checked> Controlar estoque</label>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">Cancelar</button>
+        <button type="submit" value="default" class="primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <div id="printArea" class="print-area"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
