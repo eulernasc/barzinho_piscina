@@ -7,6 +7,7 @@
   <title>Barzinho da Piscina</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="operations.css">
 </head>
 <body>
   <div class="app-shell">
@@ -18,23 +19,33 @@
 
       <div class="nav-label">Navegação</div>
       <nav>
-        <button class="nav-btn active" data-view="pdv"><svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-3-1.5L9 21l-2.5-1.5L4 21V3Zm4 5h8M8 12h8M8 16h5"/></svg><span>PDV</span></button>
+        <button class="nav-btn active" data-view="visao"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm10 8h8V11h-8zm0-18v6h8V3zM3 15v6h8v-6z"/></svg><span>Visão geral</span></button>
+        <button class="nav-btn" data-view="pdv"><svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-3-1.5L9 21l-2.5-1.5L4 21V3Zm4 5h8M8 12h8M8 16h5"/></svg><span>PDV</span></button>
+        <button class="nav-btn" data-view="comandas"><svg viewBox="0 0 24 24"><path d="M4 3h16v15H8l-4 3V3zm4 5h8m-8 4h6"/></svg><span>Comandas</span></button>
+        <button class="nav-btn" data-view="cozinha"><svg viewBox="0 0 24 24"><path d="M5 13V8a4 4 0 0 1 7-2 4 4 0 0 1 7 2v5M4 13h16v5H4zm4 5v3m8-3v3"/></svg><span>Cozinha</span></button>
         <button class="nav-btn" data-view="produtos"><svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4Zm8 4v10l-8 4-8-4V7m8 4v10"/></svg><span>Produtos</span></button>
         <button class="nav-btn" data-view="estoque"><svg viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7M3 20h18"/></svg><span>Estoque</span></button>
         <button class="nav-btn" data-view="financeiro"><svg viewBox="0 0 24 24"><path d="M12 2v20m5-16H9.5A3.5 3.5 0 0 0 6 9.5C6 12 8 13 12 13s6 1 6 3.5A3.5 3.5 0 0 1 14.5 20H7"/></svg><span>Financeiro</span></button>
+        <button class="nav-btn" data-view="relatorios"><svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8M2 21h20"/></svg><span>Relatórios</span></button>
         <button class="nav-btn" data-view="historico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-3v7l4 2"/></svg><span>Histórico</span></button>
       </nav>
 
-      <div class="sidebar-card"><span class="status-dot"></span><div><strong>Sistema ativo</strong><small>Versão inicial · dados locais</small></div></div>
+      <div class="sidebar-card"><span class="status-dot"></span><div><strong>Sistema ativo</strong><small>Modo local · dispositivo atual</small></div></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div><span class="eyebrow">Operação do bar</span><h1 id="viewTitle">PDV</h1><p id="viewSubtitle">Venda rápida no balcão e emissão de fichas individuais.</p></div>
+        <div><span class="eyebrow">Operação do bar</span><h1 id="viewTitle">Visão geral</h1><p id="viewSubtitle">Uma visão completa do movimento do Barzinho.</p></div>
         <div class="top-actions"><div class="date-pill"><svg viewBox="0 0 24 24"><path d="M7 2v3m10-3v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg><span id="clock"></span></div><button id="seedBtn" class="secondary">Carregar exemplo</button></div>
       </header>
 
-      <section id="view-pdv" class="view active-view">
+      <div class="sync-notice" role="status"><span class="sync-dot"></span><span><strong>Modo de testes:</strong> os dados ainda ficam neste navegador. A sincronização entre celulares e computadores será ativada com o Firebase.</span></div>
+      <section id="view-visao" class="view active-view">
+        <div class="welcome-banner"><div><div class="welcome-overline">PRAÇA DE ESPORTES · BARZINHO DA PISCINA</div><h2>Seu bar organizado,<br>do balcão à cozinha.</h2><p>Acompanhe vendas, comandas e atendimento em um só lugar.</p><div class="welcome-actions"><button id="dashboardNewOrder" class="light-button">+ Abrir comanda</button><button id="dashboardGoOrders" class="outlined-light">Ver comandas →</button></div></div><div class="welcome-mark"><img src="assets/logo.svg" alt="Marca Barzinho da Piscina"></div></div>
+        <div id="dashboardStats" class="metric-grid"></div>
+        <div class="dashboard-columns"><section class="surface-card"><div class="surface-head"><div><span class="mini-label">EM ANDAMENTO</span><h2>Comandas abertas</h2></div><span class="subtle-tag">Ao vivo neste dispositivo</span></div><div id="dashboardRecent"></div></section><section class="surface-card"><div class="surface-head"><div><span class="mini-label">ÚLTIMAS VENDAS</span><h2>Movimento recente</h2></div></div><div id="dashboardSales"></div></section></div>
+      </section>
+      <section id="view-pdv" class="view">
         <div class="pdv-overview">
           <div class="overview-card accent-blue"><div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg></div><div><span>Atendimento</span><strong>Venda no balcão</strong></div></div>
           <div class="overview-card accent-cyan"><div class="overview-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v5H5zM7 9v11m10-11v11M5 14h14"/></svg></div><div><span>Fichas</span><strong>Uma por produto</strong></div></div>
@@ -62,6 +73,15 @@
         </div>
       </section>
 
+      <section id="view-comandas" class="view">
+        <div class="section-head"><div><span class="mini-label">ATENDIMENTO</span><h2>Comandas e mesas</h2><p>Abra uma conta, lance pedidos e receba tudo no final.</p></div><button id="newOrderBtn" class="primary">+ Nova comanda</button></div>
+        <div class="orders-layout"><section class="orders-sidebar surface-card"><div class="orders-toolbar"><input id="orderSearch" aria-label="Buscar comandas" placeholder="Buscar cliente, mesa ou número"><span id="ordersCount" class="list-count">0 comandas</span></div><div id="orderFilters" class="segmented-filters"><button data-order-filter="open" class="active">Abertas</button><button data-order-filter="closed">Fechadas</button><button data-order-filter="all">Todas</button></div><div id="ordersList" class="orders-list"></div></section><section id="orderDetail" class="surface-card order-detail"></section></div>
+      </section>
+      <section id="view-cozinha" class="view">
+        <div class="section-head"><div><span class="mini-label">PRODUÇÃO</span><h2>Painel da cozinha e do bar</h2><p>Acompanhe e atualize o preparo dos pedidos enviados pelos garçons.</p></div><span id="kitchenCount" class="panel-chip">0 pedidos</span></div>
+        <div id="kitchenFilters" class="segmented-filters standalone"><button class="active" data-kitchen-filter="active">Em andamento</button><button data-kitchen-filter="new">Novos</button><button data-kitchen-filter="preparing">Em preparo</button><button data-kitchen-filter="ready">Prontos</button><button data-kitchen-filter="all">Todos</button></div>
+        <div id="kitchenBoard" class="kitchen-board"></div>
+      </section>
       <section id="view-produtos" class="view">
         <div class="section-head"><div><span class="mini-label">Cadastro</span><h2>Produtos e pratos</h2><p>Preço, custo, margem e controle de estoque.</p></div><button id="newProductBtn" class="primary">+ Novo produto</button></div>
         <div id="productsTableWrap" class="table-card"></div>
@@ -75,11 +95,18 @@
 
       <section id="view-financeiro" class="view">
         <div class="section-head"><div><span class="mini-label">Caixa e compras</span><h2>Financeiro</h2><p>Vendas, custos, compras de estoque, entradas e saídas.</p></div><button id="newPurchaseBtn" class="primary">+ Registrar compra</button></div>
-        <div class="stats-grid finance-stats"><div class="stat-card"><span>Faturamento</span><strong id="revenue">R$ 0,00</strong></div><div class="stat-card"><span>Custo das vendas</span><strong id="cogs">R$ 0,00</strong></div><div class="stat-card"><span>Compras de estoque</span><strong id="purchasesTotal">R$ 0,00</strong></div><div class="stat-card"><span>Lucro bruto</span><strong id="grossProfit">R$ 0,00</strong></div><div class="stat-card"><span>Margem</span><strong id="margin">0%</strong></div></div>
+        <div class="date-filters"><label>De <input type="date" id="financeFrom"></label><label>Até <input type="date" id="financeTo"></label><button id="financeReset" class="secondary">Limpar período</button></div>
+        <div class="stats-grid finance-stats"><div class="stat-card"><span>Faturamento</span><strong id="revenue">R$ 0,00</strong></div><div class="stat-card"><span>Custo das vendas</span><strong id="cogs">R$ 0,00</strong></div><div class="stat-card"><span>Compras de estoque</span><strong id="purchasesTotal">R$ 0,00</strong></div><div class="stat-card"><span>Lucro bruto</span><strong id="grossProfit">R$ 0,00</strong></div><div class="stat-card"><span>Margem</span><strong id="margin">0%</strong></div><div class="stat-card"><span>Fluxo de caixa*</span><strong id="cashBalance">R$ 0,00</strong></div></div><p class="fine-print">* Vendas + entradas manuais − saídas registradas, incluindo compras. Lucro bruto não representa lucro líquido.</p>
         <div class="two-col"><div class="table-card"><h3>Resumo por forma de pagamento</h3><div id="paymentSummary"></div></div><div class="table-card"><h3>Entradas e saídas</h3><div class="cash-form"><select id="movementType"><option value="entrada">Entrada</option><option value="saida">Saída</option></select><input id="movementDesc" placeholder="Descrição"><input id="movementValue" type="number" step="0.01" min="0" placeholder="Valor"><button id="addMovement" class="secondary">Registrar</button></div><div id="movementList"></div></div></div>
         <div class="table-card purchases-card"><div class="table-title-row"><div><span class="mini-label">Compras</span><h3>Produtos comprados para o bar</h3></div><span class="panel-chip">Compra aumenta estoque e gera saída</span></div><div id="purchasesTableWrap"></div></div>
       </section>
 
+      <section id="view-relatorios" class="view">
+        <div class="section-head"><div><span class="mini-label">RESULTADOS</span><h2>Relatórios do bar</h2><p>Vendas por período, evolução diária e produtos mais vendidos.</p></div><button id="exportSalesBtn" class="primary">Exportar vendas (CSV)</button></div>
+        <div class="date-filters"><label>De <input type="date" id="reportsFrom"></label><label>Até <input type="date" id="reportsTo"></label><button id="reportsReset" class="secondary">Limpar período</button></div>
+        <div id="reportStats" class="metric-grid"></div>
+        <div class="dashboard-columns reports-columns"><section class="surface-card"><div class="surface-head"><div><span class="mini-label">MOVIMENTO</span><h2>Faturamento diário</h2></div></div><div id="dailySales" class="daily-chart"></div></section><section class="surface-card"><div class="surface-head"><div><span class="mini-label">CARDÁPIO</span><h2>Mais vendidos</h2></div></div><div id="topProducts" class="ranked-products"></div></section></div>
+      </section>
       <section id="view-historico" class="view">
         <div class="section-head"><div><span class="mini-label">Movimentação</span><h2>Histórico de vendas</h2><p>Pedidos concluídos, entregas imediatas e fichas emitidas.</p></div></div>
         <div id="salesTableWrap" class="table-card"></div>
@@ -87,6 +114,7 @@
     </main>
   </div>
 
+  <dialog id="orderDialog" class="order-dialog"><form method="dialog" id="orderForm"><div class="dialog-head"><div><span class="mini-label">NOVA COMANDA</span><h2>Iniciar atendimento</h2><p>Identifique o cliente ou a mesa para começar.</p></div><button value="cancel" class="icon-btn" aria-label="Fechar">✕</button></div><div class="form-grid"><label><span>Nome do cliente</span><input id="orderCustomer" maxlength="80" placeholder="Ex.: João"></label><label><span>Mesa / identificação</span><input id="orderTable" maxlength="40" placeholder="Ex.: 05 ou Piscina"></label><label class="full"><span>Garçom responsável</span><input id="orderWaiter" maxlength="80" placeholder="Nome do atendente"></label></div><p class="hint-text">Informe pelo menos o cliente ou a mesa.</p><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" class="primary">Abrir comanda</button></div></form></dialog>
   <dialog id="productDialog"><form method="dialog" id="productForm"><div class="dialog-head"><h2 id="productDialogTitle">Novo produto</h2><button value="cancel" class="icon-btn">✕</button></div><input type="hidden" id="productId"><div class="form-grid"><label><span>Nome</span><input id="productName" required></label><label><span>Categoria</span><input id="productCategory" required placeholder="Ex.: Bebidas"></label><label><span>Preço de venda</span><input id="productPrice" type="number" step="0.01" min="0" required></label><label><span>Custo</span><input id="productCost" type="number" step="0.01" min="0" required></label><label><span>Estoque</span><input id="productStock" type="number" step="1" min="0" required></label><label><span>Estoque mínimo</span><input id="productMinStock" type="number" step="1" min="0" value="5" required></label></div><label class="check-row"><input id="productTrackStock" type="checkbox" checked> Controlar estoque</label><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar</button></div></form></dialog>
 
   <dialog id="stockDialog"><form method="dialog" id="stockForm"><div class="dialog-head"><div><span class="mini-label">Ajuste manual</span><h2>Ajustar estoque</h2></div><button value="cancel" class="icon-btn">✕</button></div><input type="hidden" id="stockProductId"><div id="stockProductName" class="dialog-product-name"></div><div class="form-grid"><label><span>Estoque atual</span><input id="stockCurrent" disabled></label><label><span>Novo estoque</span><input id="stockNew" type="number" step="1" min="0" required></label><label class="full"><span>Motivo do ajuste</span><input id="stockReason" placeholder="Ex.: contagem física, perda, quebra..." required></label></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancelar</button><button type="submit" value="default" class="primary">Salvar ajuste</button></div></form></dialog>
