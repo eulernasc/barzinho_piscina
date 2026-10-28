@@ -15,10 +15,13 @@
       <div class="brand">
         <div class="brand-logo-wrap"><img src="assets/logo.svg" alt="Barzinho da Piscina"></div>
         <div class="brand-copy"><strong>Barzinho da Piscina</strong><span>Praça de Esportes</span></div>
+        <button id="menuToggle" class="mobile-menu-toggle" type="button" aria-label="Abrir menu" aria-controls="mainNav" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
       </div>
 
       <div class="nav-label">Navegação</div>
-      <nav>
+      <nav id="mainNav">
         <button class="nav-btn active" data-view="visao"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm10 8h8V11h-8zm0-18v6h8V3zM3 15v6h8v-6z"/></svg><span>Visão geral</span></button>
         <button class="nav-btn" data-view="pdv"><svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-3-1.5L9 21l-2.5-1.5L4 21V3Zm4 5h8M8 12h8M8 16h5"/></svg><span>PDV</span></button>
         <button class="nav-btn" data-view="comandas"><svg viewBox="0 0 24 24"><path d="M4 3h16v15H8l-4 3V3zm4 5h8m-8 4h6"/></svg><span>Comandas</span></button>
@@ -32,6 +35,7 @@
 
       <div class="sidebar-card"><span class="status-dot"></span><div><strong>Sistema ativo</strong><small>Modo local · dispositivo atual</small></div></div>
     </aside>
+    <button id="menuBackdrop" class="mobile-menu-backdrop" type="button" aria-label="Fechar menu"></button>
 
     <main class="main">
       <header class="topbar">
