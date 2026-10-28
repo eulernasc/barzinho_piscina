@@ -36,7 +36,7 @@ export function initOperations(apiRef){
   document.getElementById('orderSearch').addEventListener('input',()=>renderOrders());
   document.getElementById('orderFilters').addEventListener('click',e=>{const b=e.target.closest('[data-order-filter]');if(!b)return;orderFilter=b.dataset.orderFilter;renderOrders()});
   document.getElementById('kitchenFilters').addEventListener('click',e=>{const b=e.target.closest('[data-kitchen-filter]');if(!b)return;kitchenFilter=b.dataset.kitchenFilter;renderKitchen()});
-  document.getElementById('ordersList').addEventListener('click',e=>{const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';renderOrders()});
+  document.getElementById('ordersList').addEventListener('click',e=>{const del=e.target.closest('[data-delete-order-card]');if(del){e.preventDefault();e.stopPropagation();deleteOrder(del.dataset.deleteOrderCard);return}const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';renderOrders()});
   document.getElementById('orderDetail').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.orderPayment){orderPayment=b.dataset.orderPayment;renderOrderPaymentState();return}
@@ -117,8 +117,8 @@ function closeOrder(){
   o.status='closed';o.closedAt=now;o.payment=payment;
   syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment});orderDraft={};save();api.toast(`Comanda #${o.number} fechada. Financeiro atualizado sem duplicar a venda.`)
 }
-function deleteOrder(){
-  const o=selectedOrder();if(!o)return;
+function deleteOrder(orderId=selectedOrderId){
+  const o=orders().find(x=>x.id===orderId);if(!o)return;
   const d=db(),linkedSales=d.sales.filter(s=>(o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id));
   const qty=orderQty(o),parts=[];
   if(qty)parts.push(`${qty} item(ns) lançado(s) também sairão da cozinha/histórico da comanda.`);
@@ -128,7 +128,8 @@ function deleteOrder(){
   if(!confirm(`Excluir a comanda #${o.number}${o.customer?` de ${o.customer}`:''}?${detail}`))return;
   d.sales=d.sales.filter(s=>!((o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id)));
   d.orders=d.orders.filter(x=>x.id!==o.id);
-  selectedOrderId=null;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';save();
+  if(selectedOrderId===o.id){selectedOrderId=null;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro'}
+  save();
   api.toast(`Comanda #${o.number} excluída.`)
 }
 function updateKitchenStatus(batchId,next){
@@ -158,7 +159,7 @@ function renderOrders(){
   const list=orders().filter(o=>(orderFilter==='all'||o.status===orderFilter)&&(!q||[o.customer,o.table,o.waiter,o.number].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ordersCount').textContent=`${list.length} comanda${list.length===1?'':'s'}`;
   document.querySelector('.orders-layout')?.classList.toggle('has-selection',Boolean(selectedOrderId));
-  document.getElementById('ordersList').innerHTML=list.length?list.map(o=>`<button class="order-card ${o.id===selectedOrderId?'selected':''}" data-select-order="${esc(o.id)}"><div class="order-card-top"><span class="order-num">#${esc(o.number)}</span>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div><strong>${esc(orderLabel(o))}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Sem garçom')} • ${dateText(o.createdAt)}</small><div class="order-card-bottom"><span>${orderQty(o)} itens</span><b>${api.money(orderTotal(o))}</b></div></button>`).join(''):'<div class="illustrated-empty">Nenhuma comanda encontrada nesse filtro.</div>';
+  document.getElementById('ordersList').innerHTML=list.length?list.map(o=>`<article class="order-card ${o.id===selectedOrderId?'selected':''}"><button type="button" class="order-card-main" data-select-order="${esc(o.id)}"><div class="order-card-top"><span class="order-num">#${esc(o.number)}</span>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div><strong>${esc(orderLabel(o))}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Sem garçom')} • ${dateText(o.createdAt)}</small><div class="order-card-bottom"><span>${orderQty(o)} itens</span><b>${api.money(orderTotal(o))}</b></div></button><button type="button" class="order-card-delete" data-delete-order-card="${esc(o.id)}" aria-label="Excluir comanda #${esc(o.number)}"><span aria-hidden="true">⌫</span> Excluir</button></article>`).join(''):'<div class="illustrated-empty">Nenhuma comanda encontrada nesse filtro.</div>';
   renderOrderDetail()
 }
 function paymentButtons(selected=orderPayment){

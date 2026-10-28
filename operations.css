@@ -208,3 +208,25 @@ dialog form{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:con
 .movement-side small{color:#8797a7}
 .movement-side .link-btn{font-size:11px;padding:2px 0}
 @media(max-width:640px){.finance-sales-card,.purchases-card{padding:12px}.movement{align-items:flex-start}.movement-side{align-items:flex-end}.finance-sales-card .table-title-row .panel-chip{display:none}}
+
+/* Exclusão sempre visível em comandas e tabelas financeiras/histórico */
+.order-card{position:relative;overflow:hidden;padding:0}
+.order-card-main{display:block;width:100%;border:0;background:transparent;text-align:left;padding:14px 14px 46px;color:inherit;cursor:pointer}
+.order-card-main>strong{display:block;font-size:16px;color:#1d334c;margin:11px 0 4px}
+.order-card-main>small{color:#8799a8;font-size:11px}
+.order-card-main .order-card-bottom{margin-top:14px}
+.order-card-delete{position:absolute;left:14px;bottom:10px;display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:4px 8px;border:0;background:transparent;color:#b33832;font-size:11px;font-weight:850;cursor:pointer;border-radius:8px}
+.order-card-delete:hover{background:#fff0ef;color:#8d221d}
+.order-card-delete span{font-size:15px;line-height:1}
+
+.sticky-actions-col{position:sticky;left:0;z-index:3;background:#fff;min-width:104px;box-shadow:1px 0 0 #e8eef4}
+thead .sticky-actions-col{z-index:4;background:#f8fbfd}
+.delete-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:6px 10px;border:1px solid #efc7c3;border-radius:9px;background:#fff7f6;color:#b33832;font-size:11px;font-weight:850;white-space:nowrap;cursor:pointer}
+.delete-action:hover{background:#ffefed;border-color:#e6aaa4;color:#8d221d}
+.delete-action span{font-size:15px;line-height:1}
+@media(max-width:640px){
+  .order-card-main{padding:13px 13px 44px}
+  .order-card-delete{left:12px;bottom:8px;min-height:30px}
+  .sticky-actions-col{min-width:94px}
+  .delete-action{min-height:36px;padding:6px 9px}
+}
