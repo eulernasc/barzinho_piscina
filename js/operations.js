@@ -21,15 +21,22 @@ function orderTotal(order){return sum(order.batches||[], b => sum(b.items || [],
 function orderQty(order){return sum(order.batches||[], b => sum(b.items || [],i=>i.qty))}
 function save(){api.saveDb();api.renderAll()}
 function todayIso(){return localDate(new Date())}
+function orderLabel(o){return o?.customer || (o?.table ? `Mesa ${o.table}` : `Comanda #${o?.number||''}`)}
+function openOrderDialog(){const form=document.getElementById('orderForm'),dialog=document.getElementById('orderDialog');form?.reset();if(dialog&&!dialog.open){dialog.showModal();setTimeout(()=>document.getElementById('orderCustomer')?.focus(),0)}}
+function dismissOrderDialog(){document.getElementById('orderForm')?.reset();const dialog=document.getElementById('orderDialog');if(dialog?.open)dialog.close()}
 function inRange(value,from=reportFrom,to=reportTo){const day=localDate(value);return (!from||day>=from)&&(!to||day<=to)}
 export function initOperations(apiRef){
   api=apiRef;
-  document.getElementById('newOrderBtn').addEventListener('click',()=>document.getElementById('orderDialog').showModal());
+  reconcileExistingOrderSales();
+  document.getElementById('newOrderBtn').addEventListener('click',openOrderDialog);
   document.getElementById('orderForm').addEventListener('submit',createOrder);
+  document.getElementById('closeOrderDialog').addEventListener('click',dismissOrderDialog);
+  document.getElementById('cancelOrderDialog').addEventListener('click',dismissOrderDialog);
+  document.getElementById('orderDialog').addEventListener('cancel',()=>{document.getElementById('orderForm').reset()});
   document.getElementById('orderSearch').addEventListener('input',()=>renderOrders());
   document.getElementById('orderFilters').addEventListener('click',e=>{const b=e.target.closest('[data-order-filter]');if(!b)return;orderFilter=b.dataset.orderFilter;renderOrders()});
   document.getElementById('kitchenFilters').addEventListener('click',e=>{const b=e.target.closest('[data-kitchen-filter]');if(!b)return;kitchenFilter=b.dataset.kitchenFilter;renderKitchen()});
-  document.getElementById('ordersList').addEventListener('click',e=>{const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';renderOrders()});
+  document.getElementById('ordersList').addEventListener('click',e=>{const del=e.target.closest('[data-delete-order-card]');if(del){e.preventDefault();e.stopPropagation();deleteOrder(del.dataset.deleteOrderCard);return}const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';renderOrders()});
   document.getElementById('orderDetail').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.orderPayment){orderPayment=b.dataset.orderPayment;renderOrderPaymentState();return}
@@ -37,11 +44,12 @@ export function initOperations(apiRef){
     if(b.dataset.draftRemove)updateDraft(b.dataset.draftRemove,-1);
     if(b.id==='sendOrderBtn')sendOrder();
     if(b.id==='closeOrderBtn')closeOrder();
+    if(b.id==='deleteOrderBtn')deleteOrder();
     if(b.id==='backOrdersBtn'){selectedOrderId=null;orderDraft={};orderPayment='Dinheiro';renderOrders()}
   });
   document.getElementById('kitchenBoard').addEventListener('click',e=>{const b=e.target.closest('[data-kitchen-status]');if(b)updateKitchenStatus(b.dataset.batchId,b.dataset.kitchenStatus)});
   document.getElementById('dashboardRecent').addEventListener('click',e=>{const b=e.target.closest('[data-dashboard-order]');if(!b)return;selectedOrderId=b.dataset.dashboardOrder;orderFilter='open';api.setView('comandas')});
-  document.getElementById('dashboardNewOrder').addEventListener('click',()=>document.getElementById('orderDialog').showModal());
+  document.getElementById('dashboardNewOrder').addEventListener('click',openOrderDialog);
   document.getElementById('dashboardGoOrders').addEventListener('click',()=>api.setView('comandas'));
   document.getElementById('reportsFrom').addEventListener('change',e=>{reportFrom=e.target.value;if(reportFrom&&reportTo&&reportFrom>reportTo)reportTo=reportFrom;syncReportRange();renderReports()});
   document.getElementById('reportsTo').addEventListener('change',e=>{reportTo=e.target.value;if(reportFrom&&reportTo&&reportTo<reportFrom)reportFrom=reportTo;syncReportRange();renderReports()});
@@ -53,12 +61,11 @@ function createOrder(e){
   const customer=document.getElementById('orderCustomer').value.trim().slice(0,80);
   const table=document.getElementById('orderTable').value.trim().slice(0,40);
   const waiter=document.getElementById('orderWaiter').value.trim().slice(0,80);
-  if(!customer&&!table){api.toast('Informe o cliente ou número da mesa.');return}
   const d=db();
   const order={id:api.uid('cmd'),number:String((d.orderCounter || 1000)+1),customer,table,waiter,createdAt:new Date().toISOString(),status:'open',batches:[]};
   d.orderCounter=Number(order.number);d.orders.unshift(order);
   selectedOrderId=order.id;orderFilter='open';orderDraft={};orderPayment='Dinheiro';
-  document.getElementById('orderForm').reset();document.getElementById('orderDialog').close();save();
+  dismissOrderDialog();save();
   api.setView('comandas');api.toast(`Comanda #${order.number} aberta.`)
 }
 function selectedOrder(){return orders().find(o=>o.id===selectedOrderId)}
@@ -81,23 +88,61 @@ function sendOrder(){
   o.batches.push({id:api.uid('lot'),items,status:'new',createdAt:now});
   orderDraft={};save();api.toast('Pedido enviado para o painel da cozinha.');
 }
+function reconcileExistingOrderSales(){
+  let changed=false;
+  for(const o of orders()){
+    if(o.financialDeletedAt)continue;
+    const hasSale=(o.saleId&&db().sales.some(s=>s.id===o.saleId))||db().sales.some(s=>s.source==='comanda'&&s.orderId===o.id);
+    if(hasSale)continue;
+    if(o.status==='closed'&&(o.batches||[]).length){syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment:o.payment||'Não informado'});changed=true}
+    else if(o.status==='open'&&(o.batches||[]).some(b=>b.status==='delivered')){syncOrderFinancialSale(o,{includeAll:false,finalize:false});changed=true}
+  }
+  if(changed)api.saveDb();
+}
+function orderSaleItems(o,includeAll=false){return (o.batches||[]).filter(b=>includeAll||b.status==='delivered').flatMap(b=>b.items.map(i=>({productId:i.productId,name:i.name,immediateQty:i.qty,tokenQty:0,qty:i.qty,unitPrice:Number(i.unitPrice||0),unitCost:Number(i.unitCost||0),batchId:b.id})))}
+function syncOrderFinancialSale(o,{includeAll=false,finalize=false,payment=null}={}){
+  if(o.financialDeletedAt)return null;
+  const items=orderSaleItems(o,includeAll);if(!items.length)return null;
+  const d=db(),now=new Date().toISOString();
+  let sale=(o.saleId&&d.sales.find(s=>s.id===o.saleId))||d.sales.find(s=>s.source==='comanda'&&s.orderId===o.id);
+  if(!sale){sale={id:api.uid('v'),number:o.number,createdAt:now,source:'comanda',orderId:o.id,customer:o.customer,table:o.table,waiter:o.waiter};d.sales.unshift(sale);o.saleId=sale.id}
+  Object.assign(sale,{customer:o.customer,table:o.table,waiter:o.waiter,items,total:sum(items,i=>i.qty*i.unitPrice),cost:sum(items,i=>i.qty*i.unitCost),tokenCount:0,immediateCount:sum(items,i=>i.qty),deliveredBatchIds:[...new Set(items.map(i=>i.batchId))],updatedAt:now});
+  if(finalize){sale.payment=payment||o.payment||'Não informado';sale.financialStatus='finalized';sale.receivedAt=now}else{sale.payment='Pendente';sale.financialStatus='pending'}
+  return sale
+}
 function closeOrder(){
   const o=selectedOrder();if(!o||o.status!=='open')return;
   if(!o.batches.length){api.toast('Envie pelo menos um pedido antes de fechar.');return}
   if(o.batches.some(b=>b.status!=='delivered')&&!confirm('Há itens ainda não marcados como entregues. Deseja fechar a comanda mesmo assim?'))return;
-  const payment=orderPayment;
-  const items=o.batches.flatMap(b=>b.items.map(i=>({productId:i.productId,name:i.name,immediateQty:i.qty,tokenQty:0,qty:i.qty,unitPrice:i.unitPrice,unitCost:i.unitCost})));
-  const now=new Date().toISOString();
-  const sale={id:api.uid('v'),number:o.number,createdAt:now,source:'comanda',orderId:o.id,customer:o.customer,table:o.table,waiter:o.waiter,payment,items,total:sum(items,i=>i.qty*i.unitPrice),cost:sum(items,i=>i.qty*i.unitCost),tokenCount:0,immediateCount:sum(items,i=>i.qty)};
-  o.status='closed';o.closedAt=now;o.payment=payment;o.saleId=sale.id;
-  db().sales.unshift(sale);orderDraft={};save();api.toast(`Comanda #${o.number} fechada. Venda registrada.`)
+  if(o.financialDeletedAt){if(!confirm('O lançamento anterior foi excluído. Fechar e receber criará uma nova venda com todos os itens. Continuar?'))return;delete o.financialDeletedAt;}
+  const payment=orderPayment,now=new Date().toISOString();
+  o.status='closed';o.closedAt=now;o.payment=payment;
+  syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment});orderDraft={};save();api.toast(`Comanda #${o.number} fechada. Financeiro atualizado sem duplicar a venda.`)
+}
+function deleteOrder(orderId=selectedOrderId){
+  const o=orders().find(x=>x.id===orderId);if(!o)return;
+  const d=db(),linkedSales=d.sales.filter(s=>(o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id));
+  const qty=orderQty(o),parts=[];
+  if(qty)parts.push(`${qty} item(ns) lançado(s) também sairão da cozinha/histórico da comanda.`);
+  if(linkedSales.length)parts.push('O lançamento financeiro vinculado também será removido.');
+  if(qty)parts.push('O estoque NÃO será devolvido automaticamente; se necessário, faça um ajuste de estoque depois.');
+  if(!qty&&!linkedSales.length)parts.push('A comanda sairá das abertas sem gerar venda, lançamento financeiro ou histórico e sem alterar o estoque.');
+  const detail=parts.length?`\n\n${parts.join('\n')}`:'';
+  if(!confirm(`${o.status==='open'?'Cancelar':'Excluir'} a comanda #${o.number}${o.customer?` de ${o.customer}`:''}?${detail}`))return;
+  d.sales=d.sales.filter(s=>!((o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id)));
+  d.orders=d.orders.filter(x=>x.id!==o.id);
+  if(selectedOrderId===o.id){selectedOrderId=null;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro'}
+  save();
+  api.toast(`Comanda #${o.number} excluída.`)
 }
 function updateKitchenStatus(batchId,next){
   const allowed={new:'preparing',preparing:'ready',ready:'delivered'};
   const o=orders().find(x=>x.batches.some(b=>b.id===batchId));
   const b=o?.batches.find(x=>x.id===batchId);
   if(!b||allowed[b.status]!==next)return;
-  b.status=next;b[`${next}At`]=new Date().toISOString();save();api.toast('Etapa atualizada.')
+  const now=new Date().toISOString();b.status=next;b[`${next}At`]=now;
+  if(next==='delivered')syncOrderFinancialSale(o,{includeAll:o.status==='closed',finalize:o.status==='closed',payment:o.payment});
+  save();api.toast(next==='delivered'?'Pedido entregue e lançado no financeiro.':'Etapa atualizada.')
 }
 export function renderOperations(){if(!api)return;renderDashboard();renderOrders();renderKitchen();renderReports()}
 function renderDashboard(){
@@ -107,22 +152,23 @@ function renderDashboard(){
   const low=d.products.filter(p=>p.trackStock&&Number(p.stock)<=Number(p.minStock)).length;
   const cards=[['Vendas de hoje',api.money(sum(salesToday,s=>Number(s.total||0))),'blue','Entradas de balcão e comandas'],['Comandas abertas',active.length,'cyan','Aguardando fechamento'],['Pedidos na cozinha',pending.length,'gold','Novos ou em preparo'],['Estoque baixo',low,'rose','Itens que precisam de atenção']];
   document.getElementById('dashboardStats').innerHTML=cards.map(([label,val,color,hint])=>`<article class="metric-card metric-${color}"><span class="metric-label">${label}</span><strong>${val}</strong><small>${hint}</small></article>`).join('');
-  document.getElementById('dashboardRecent').innerHTML=active.length?active.slice(0,6).map(o=>`<button class="recent-order" data-dashboard-order="${esc(o.id)}"><span class="recent-avatar">#${esc(o.number).slice(-2)}</span><span><strong>${esc(o.customer||`Mesa ${o.table}`)}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Atendimento')} · ${orderQty(o)} itens</small></span><b>${api.money(orderTotal(o))}</b><span aria-hidden="true">›</span></button>`).join(''):'<div class="illustrated-empty">Nenhuma comanda aberta agora. Abra uma comanda para começar o atendimento.</div>';
+  document.getElementById('dashboardRecent').innerHTML=active.length?active.slice(0,6).map(o=>`<button class="recent-order" data-dashboard-order="${esc(o.id)}"><span class="recent-avatar">#${esc(o.number).slice(-2)}</span><span><strong>${esc(orderLabel(o))}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Atendimento')} · ${orderQty(o)} itens</small></span><b>${api.money(orderTotal(o))}</b><span aria-hidden="true">›</span></button>`).join(''):'<div class="illustrated-empty">Nenhuma comanda aberta agora. Abra uma comanda para começar o atendimento.</div>';
   const recentSales=[...d.sales].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,5);
   document.getElementById('dashboardSales').innerHTML=recentSales.length?recentSales.map(s=>`<div class="dash-sale"><span>${esc(s.customer||'Balcão')} <small>· ${dateText(s.createdAt)}</small></span><b>${api.money(s.total)}</b></div>`).join(''):'<div class="illustrated-empty">As vendas aparecerão aqui assim que forem concluídas.</div>';
 }
 function renderOrders(){
+  if(selectedOrderId&&!selectedOrder()){selectedOrderId=null;orderDraft={};}
   document.querySelectorAll('#orderFilters [data-order-filter]').forEach(b=>b.classList.toggle('active',b.dataset.orderFilter===orderFilter));
   const q=(document.getElementById('orderSearch')?.value||'').toLowerCase().trim();
   const list=orders().filter(o=>(orderFilter==='all'||o.status===orderFilter)&&(!q||[o.customer,o.table,o.waiter,o.number].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ordersCount').textContent=`${list.length} comanda${list.length===1?'':'s'}`;
   document.querySelector('.orders-layout')?.classList.toggle('has-selection',Boolean(selectedOrderId));
-  document.getElementById('ordersList').innerHTML=list.length?list.map(o=>`<button class="order-card ${o.id===selectedOrderId?'selected':''}" data-select-order="${esc(o.id)}"><div class="order-card-top"><span class="order-num">#${esc(o.number)}</span>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div><strong>${esc(o.customer||`Mesa ${o.table}`)}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Sem garçom')} • ${dateText(o.createdAt)}</small><div class="order-card-bottom"><span>${orderQty(o)} itens</span><b>${api.money(orderTotal(o))}</b></div></button>`).join(''):'<div class="illustrated-empty">Nenhuma comanda encontrada nesse filtro.</div>';
+  document.getElementById('ordersList').innerHTML=list.length?list.map(o=>`<article class="order-card ${o.id===selectedOrderId?'selected':''}"><button type="button" class="order-card-main" data-select-order="${esc(o.id)}"><div class="order-card-top"><span class="order-num">#${esc(o.number)}</span>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div><strong>${esc(orderLabel(o))}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Sem garçom')} • ${dateText(o.createdAt)}</small><div class="order-card-bottom"><span>${orderQty(o)} itens</span><b>${api.money(orderTotal(o))}</b></div></button><button type="button" class="order-card-delete" data-delete-order-card="${esc(o.id)}" aria-label="Excluir comanda #${esc(o.number)}"><span aria-hidden="true">⌫</span> Excluir</button></article>`).join(''):'<div class="illustrated-empty">Nenhuma comanda encontrada nesse filtro.</div>';
   renderOrderDetail()
 }
 function paymentButtons(selected=orderPayment){
-  const options=[['Dinheiro','$','Espécie'],['PIX','◆','Instantâneo'],['Débito','▣','Cartão'],['Crédito','▤','Cartão']];
-  return options.map(([value,icon,hint])=>`<button type="button" class="payment-option ${selected===value?'active':''}" data-order-payment="${esc(value)}" aria-pressed="${selected===value?'true':'false'}"><span class="payment-icon" aria-hidden="true">${icon}</span><span><strong>${value}</strong><small>${hint}</small></span></button>`).join('')
+  const options=[['Dinheiro','R$','Espécie'],['PIX','◆','Instantâneo'],['Débito','▣','Cartão'],['Crédito','▤','Cartão']];
+  return options.map(([value,icon,hint])=>`<button type="button" class="payment-option ${selected===value?'active':''}" data-order-payment="${esc(value)}" aria-pressed="${selected===value?'true':'false'}"><span class="payment-icon ${value==='Dinheiro'?'payment-icon-money':''}" aria-hidden="true">${icon}</span><span><strong>${value}</strong><small>${hint}</small></span></button>`).join('')
 }
 function renderOrderPaymentState(){
   const root=document.getElementById('orderDetail');
@@ -136,7 +182,7 @@ function renderOrderDetail(){
   const batches=(o.batches||[]).slice().reverse().map(b=>`<div class="order-batch"><div class="batch-meta"><span>${dateText(b.createdAt)}</span>${pill(batchStatus[b.status]?.[0]||b.status,batchStatus[b.status]?.[1])}</div>${b.items.map(i=>`<div class="batch-item"><span>${i.qty}× ${esc(i.name)}</span><strong>${api.money(i.unitPrice*i.qty)}</strong></div>`).join('')}</div>`).join('');
   const products=d.products.filter(p=>(!menuSearch||p.name.toLowerCase().includes(menuSearch))&&(!menuCategory||p.category===menuCategory));
   const draftTotal=sum(Object.entries(orderDraft),([id,qty])=>qty*(d.products.find(p=>p.id===id)?.price||0));
-  el.innerHTML=`<div class="order-detail-head"><div><button class="back-orders" id="backOrdersBtn">← Voltar às comandas</button><span class="mini-label">${o.status==='open'?'Atendimento em andamento':'Venda concluída'}</span><h2>${esc(o.customer||`Mesa ${o.table}`)} <span>#${esc(o.number)}</span></h2><p>${esc([o.table?`Mesa ${o.table}`:'',o.waiter?`Garçom: ${o.waiter}`:'',`Aberta: ${dateText(o.createdAt)}`].filter(Boolean).join(' · '))}</p></div>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div>
+  el.innerHTML=`<div class="order-detail-head"><div><button class="back-orders" id="backOrdersBtn">← Voltar às comandas</button><span class="mini-label">${o.status==='open'?'Atendimento em andamento':'Venda concluída'}</span><h2>${esc(o.customer || (o.table ? `Mesa ${o.table}` : 'Comanda'))} <span>#${esc(o.number)}</span></h2><p>${esc([o.table?`Mesa ${o.table}`:'',o.waiter?`Garçom: ${o.waiter}`:'',`Aberta: ${dateText(o.createdAt)}`].filter(Boolean).join(' · '))}</p></div><div class="order-head-actions">${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}<button type="button" class="danger-outline" id="deleteOrderBtn" ${editable?'aria-label="Cancelar comanda"':'aria-label="Excluir comanda"'}>${editable?'Cancelar comanda':'Excluir comanda'}</button></div></div>
   ${editable?`<div class="order-composer"><div class="subsection-heading"><h3>Adicionar produtos</h3><small>Itens só entram na conta após o envio</small></div><div class="menu-filter"><input aria-label="Buscar no cardápio" id="orderProductSearch" placeholder="Buscar no cardápio..." value="${esc(menuSearch)}"><select aria-label="Filtrar categoria" id="orderProductCategory"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${esc(c)}" ${c===menuCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="order-menu">${products.length?products.map(p=>`<div class="menu-item"><span><strong>${esc(p.name)}</strong><small>${esc(p.category)} · ${api.money(p.price)}${p.trackStock?` · ${p.stock} em estoque`:''}</small></span><div class="qty-actions"><button type="button" data-draft-remove="${esc(p.id)}" ${!orderDraft[p.id]?'disabled':''} aria-label="Diminuir ${esc(p.name)}">−</button><b>${orderDraft[p.id]||0}</b><button type="button" data-draft-add="${esc(p.id)}" ${p.trackStock&&p.stock<=(orderDraft[p.id]||0)?'disabled':''} aria-label="Adicionar ${esc(p.name)}">+</button></div></div>`).join(''):'<div class="illustrated-empty">Cadastre produtos ou ajuste sua busca para lançar pedidos.</div>'}</div><div class="send-bar"><div><small>Novos itens</small><b>${api.money(draftTotal)}</b></div><button class="primary" id="sendOrderBtn" ${!Object.keys(orderDraft).length?'disabled':''}>Enviar pedido à cozinha →</button></div></div>`:''}
   <div class="order-history"><div class="subsection-heading"><h3>Pedidos lançados</h3><small>${o.batches.length} envio(s)</small></div>${batches||'<div class="illustrated-empty">Nenhum pedido enviado nesta comanda.</div>'}</div>
   <div class="order-checkout"><div class="checkout-total"><span>Total da comanda</span><strong>${api.money(orderTotal(o))}</strong></div>${editable?`<div class="checkout-action checkout-action-modern"><div class="checkout-payment"><div class="payment-title"><span>Forma de pagamento</span><small>Selecione antes de finalizar</small></div><div class="payment-options compact" role="radiogroup" aria-label="Forma de pagamento da comanda">${paymentButtons(orderPayment)}</div></div><button class="primary close-order-button" id="closeOrderBtn" ${!o.batches.length?'disabled':''}>Fechar e receber</button></div>`:`<p>Fechada em ${dateText(o.closedAt)} · ${esc(o.payment||'Pagamento não informado')}</p>`}</div>`;
@@ -150,7 +196,7 @@ function renderKitchen(){
   const filtered=entries.filter(({b})=>kitchenFilter==='all'||(kitchenFilter==='active'?['new','preparing','ready'].includes(b.status):b.status===kitchenFilter));
   const next={new:['Iniciar preparo','preparing'],preparing:['Marcar como pronto','ready'],ready:['Marcar entregue','delivered']};
   document.getElementById('kitchenCount').textContent=`${filtered.length} pedido${filtered.length===1?'':'s'}`;
-  document.getElementById('kitchenBoard').innerHTML=filtered.length?filtered.map(({o,b})=>`<article class="kitchen-ticket status-${b.status}"><div class="kitchen-ticket-head"><span class="order-num">#${esc(o.number)}</span>${pill(batchStatus[b.status]?.[0]||b.status,batchStatus[b.status]?.[1])}</div><h3>${esc(o.customer||`Mesa ${o.table}`)}</h3><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Balcão')} · ${dateText(b.createdAt)}</small><div class="ticket-lines">${b.items.map(i=>`<div><b>${i.qty}×</b><span>${esc(i.name)} <small>· ${esc(i.area)}</small></span></div>`).join('')}</div>${next[b.status]?`<button class="secondary kitchen-next" data-batch-id="${esc(b.id)}" data-kitchen-status="${next[b.status][1]}">${next[b.status][0]} →</button>`:'<div class="ticket-finished">✓ Entregue</div>'}</article>`).join(''):'<div class="illustrated-empty full-width">Nenhum pedido nesta etapa. Novos pedidos aparecem assim que o garçom envia a comanda.</div>';
+  document.getElementById('kitchenBoard').innerHTML=filtered.length?filtered.map(({o,b})=>`<article class="kitchen-ticket status-${b.status}"><div class="kitchen-ticket-head"><span class="order-num">#${esc(o.number)}</span>${pill(batchStatus[b.status]?.[0]||b.status,batchStatus[b.status]?.[1])}</div><h3>${esc(orderLabel(o))}</h3><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Balcão')} · ${dateText(b.createdAt)}</small><div class="ticket-lines">${b.items.map(i=>`<div><b>${i.qty}×</b><span>${esc(i.name)} <small>· ${esc(i.area)}</small></span></div>`).join('')}</div>${next[b.status]?`<button class="secondary kitchen-next" data-batch-id="${esc(b.id)}" data-kitchen-status="${next[b.status][1]}">${next[b.status][0]} →</button>`:'<div class="ticket-finished">✓ Entregue</div>'}</article>`).join(''):'<div class="illustrated-empty full-width">Nenhum pedido nesta etapa. Novos pedidos aparecem assim que o garçom envia a comanda.</div>';
 }
 function renderReports(){
   syncReportRange();
