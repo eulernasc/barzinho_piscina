@@ -192,3 +192,14 @@ dialog form{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:con
   .mobile-cart-cta{font-size:10px}
 }
 @media(max-width:640px){#cartPanel{scroll-margin-top:74px}}
+
+/* Financeiro: exclusão segura e status de recebimento */
+.finance-sales-card{margin-top:16px}
+.danger-link{color:#b33832!important}
+.danger-link:hover{color:#8d221d!important;text-decoration:underline}
+.badge.pending{background:#fff0d7;color:#8b5b0d}
+.badge.paid{background:#dff8e9;color:#127347}
+.movement-side{display:flex;align-items:flex-end;flex-direction:column;gap:3px;min-width:max-content}
+.movement-side small{color:#8797a7}
+.movement-side .link-btn{font-size:11px;padding:2px 0}
+@media(max-width:640px){.finance-sales-card,.purchases-card{padding:12px}.movement{align-items:flex-start}.movement-side{align-items:flex-end}.finance-sales-card .table-title-row .panel-chip{display:none}}
