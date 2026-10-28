@@ -6,6 +6,7 @@ let kitchenFilter = 'active';
 let orderDraft = {};
 let menuSearch = '';
 let menuCategory = '';
+let orderPayment = 'Dinheiro';
 let reportFrom = '';
 let reportTo = '';
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,22 +29,23 @@ export function initOperations(apiRef){
   document.getElementById('orderSearch').addEventListener('input',()=>renderOrders());
   document.getElementById('orderFilters').addEventListener('click',e=>{const b=e.target.closest('[data-order-filter]');if(!b)return;orderFilter=b.dataset.orderFilter;renderOrders()});
   document.getElementById('kitchenFilters').addEventListener('click',e=>{const b=e.target.closest('[data-kitchen-filter]');if(!b)return;kitchenFilter=b.dataset.kitchenFilter;renderKitchen()});
-  document.getElementById('ordersList').addEventListener('click',e=>{const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';renderOrders()});
+  document.getElementById('ordersList').addEventListener('click',e=>{const b=e.target.closest('[data-select-order]');if(!b)return;selectedOrderId=b.dataset.selectOrder;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro';renderOrders()});
   document.getElementById('orderDetail').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.orderPayment){orderPayment=b.dataset.orderPayment;renderOrderPaymentState();return}
     if(b.dataset.draftAdd)updateDraft(b.dataset.draftAdd,1);
     if(b.dataset.draftRemove)updateDraft(b.dataset.draftRemove,-1);
     if(b.id==='sendOrderBtn')sendOrder();
     if(b.id==='closeOrderBtn')closeOrder();
-    if(b.id==='backOrdersBtn'){selectedOrderId=null;renderOrders()}
+    if(b.id==='backOrdersBtn'){selectedOrderId=null;orderDraft={};orderPayment='Dinheiro';renderOrders()}
   });
   document.getElementById('kitchenBoard').addEventListener('click',e=>{const b=e.target.closest('[data-kitchen-status]');if(b)updateKitchenStatus(b.dataset.batchId,b.dataset.kitchenStatus)});
   document.getElementById('dashboardRecent').addEventListener('click',e=>{const b=e.target.closest('[data-dashboard-order]');if(!b)return;selectedOrderId=b.dataset.dashboardOrder;orderFilter='open';api.setView('comandas')});
   document.getElementById('dashboardNewOrder').addEventListener('click',()=>document.getElementById('orderDialog').showModal());
   document.getElementById('dashboardGoOrders').addEventListener('click',()=>api.setView('comandas'));
-  document.getElementById('reportsFrom').addEventListener('change',e=>{reportFrom=e.target.value;renderReports()});
-  document.getElementById('reportsTo').addEventListener('change',e=>{reportTo=e.target.value;renderReports()});
-  document.getElementById('reportsReset').addEventListener('click',()=>{reportFrom='';reportTo='';renderReports()});
+  document.getElementById('reportsFrom').addEventListener('change',e=>{reportFrom=e.target.value;if(reportFrom&&reportTo&&reportFrom>reportTo)reportTo=reportFrom;syncReportRange();renderReports()});
+  document.getElementById('reportsTo').addEventListener('change',e=>{reportTo=e.target.value;if(reportFrom&&reportTo&&reportTo<reportFrom)reportFrom=reportTo;syncReportRange();renderReports()});
+  document.getElementById('reportsReset').addEventListener('click',()=>{reportFrom='';reportTo='';syncReportRange();renderReports()});
   document.getElementById('exportSalesBtn').addEventListener('click',exportSales);
 }
 function createOrder(e){
@@ -55,7 +57,7 @@ function createOrder(e){
   const d=db();
   const order={id:api.uid('cmd'),number:String((d.orderCounter || 1000)+1),customer,table,waiter,createdAt:new Date().toISOString(),status:'open',batches:[]};
   d.orderCounter=Number(order.number);d.orders.unshift(order);
-  selectedOrderId=order.id;orderFilter='open';orderDraft={};
+  selectedOrderId=order.id;orderFilter='open';orderDraft={};orderPayment='Dinheiro';
   document.getElementById('orderForm').reset();document.getElementById('orderDialog').close();save();
   api.setView('comandas');api.toast(`Comanda #${order.number} aberta.`)
 }
@@ -83,7 +85,7 @@ function closeOrder(){
   const o=selectedOrder();if(!o||o.status!=='open')return;
   if(!o.batches.length){api.toast('Envie pelo menos um pedido antes de fechar.');return}
   if(o.batches.some(b=>b.status!=='delivered')&&!confirm('Há itens ainda não marcados como entregues. Deseja fechar a comanda mesmo assim?'))return;
-  const payment=document.getElementById('orderPayment').value;
+  const payment=orderPayment;
   const items=o.batches.flatMap(b=>b.items.map(i=>({productId:i.productId,name:i.name,immediateQty:i.qty,tokenQty:0,qty:i.qty,unitPrice:i.unitPrice,unitCost:i.unitCost})));
   const now=new Date().toISOString();
   const sale={id:api.uid('v'),number:o.number,createdAt:now,source:'comanda',orderId:o.id,customer:o.customer,table:o.table,waiter:o.waiter,payment,items,total:sum(items,i=>i.qty*i.unitPrice),cost:sum(items,i=>i.qty*i.unitCost),tokenCount:0,immediateCount:sum(items,i=>i.qty)};
@@ -114,9 +116,19 @@ function renderOrders(){
   const q=(document.getElementById('orderSearch')?.value||'').toLowerCase().trim();
   const list=orders().filter(o=>(orderFilter==='all'||o.status===orderFilter)&&(!q||[o.customer,o.table,o.waiter,o.number].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ordersCount').textContent=`${list.length} comanda${list.length===1?'':'s'}`;
+  document.querySelector('.orders-layout')?.classList.toggle('has-selection',Boolean(selectedOrderId));
   document.getElementById('ordersList').innerHTML=list.length?list.map(o=>`<button class="order-card ${o.id===selectedOrderId?'selected':''}" data-select-order="${esc(o.id)}"><div class="order-card-top"><span class="order-num">#${esc(o.number)}</span>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div><strong>${esc(o.customer||`Mesa ${o.table}`)}</strong><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Sem garçom')} • ${dateText(o.createdAt)}</small><div class="order-card-bottom"><span>${orderQty(o)} itens</span><b>${api.money(orderTotal(o))}</b></div></button>`).join(''):'<div class="illustrated-empty">Nenhuma comanda encontrada nesse filtro.</div>';
   renderOrderDetail()
 }
+function paymentButtons(selected=orderPayment){
+  const options=[['Dinheiro','$','Espécie'],['PIX','◆','Instantâneo'],['Débito','▣','Cartão'],['Crédito','▤','Cartão']];
+  return options.map(([value,icon,hint])=>`<button type="button" class="payment-option ${selected===value?'active':''}" data-order-payment="${esc(value)}" aria-pressed="${selected===value?'true':'false'}"><span class="payment-icon" aria-hidden="true">${icon}</span><span><strong>${value}</strong><small>${hint}</small></span></button>`).join('')
+}
+function renderOrderPaymentState(){
+  const root=document.getElementById('orderDetail');
+  root?.querySelectorAll('[data-order-payment]').forEach(btn=>{const active=btn.dataset.orderPayment===orderPayment;btn.classList.toggle('active',active);btn.setAttribute('aria-pressed',String(active))})
+}
+function syncReportRange(){const from=document.getElementById('reportsFrom'),to=document.getElementById('reportsTo');if(!from||!to)return;from.value=reportFrom;to.value=reportTo;to.min=reportFrom||'';from.max=reportTo||''}
 function renderOrderDetail(){
   const o=selectedOrder(),el=document.getElementById('orderDetail');
   if(!o){el.innerHTML='<div class="order-placeholder"><span class="placeholder-icon">☰</span><h3>Atendimento por comanda</h3><p>Selecione uma comanda à esquerda ou abra uma nova para começar a lançar os pedidos pelo celular.</p></div>';return}
@@ -127,7 +139,7 @@ function renderOrderDetail(){
   el.innerHTML=`<div class="order-detail-head"><div><button class="back-orders" id="backOrdersBtn">← Voltar às comandas</button><span class="mini-label">${o.status==='open'?'Atendimento em andamento':'Venda concluída'}</span><h2>${esc(o.customer||`Mesa ${o.table}`)} <span>#${esc(o.number)}</span></h2><p>${esc([o.table?`Mesa ${o.table}`:'',o.waiter?`Garçom: ${o.waiter}`:'',`Aberta: ${dateText(o.createdAt)}`].filter(Boolean).join(' · '))}</p></div>${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}</div>
   ${editable?`<div class="order-composer"><div class="subsection-heading"><h3>Adicionar produtos</h3><small>Itens só entram na conta após o envio</small></div><div class="menu-filter"><input aria-label="Buscar no cardápio" id="orderProductSearch" placeholder="Buscar no cardápio..." value="${esc(menuSearch)}"><select aria-label="Filtrar categoria" id="orderProductCategory"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${esc(c)}" ${c===menuCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="order-menu">${products.length?products.map(p=>`<div class="menu-item"><span><strong>${esc(p.name)}</strong><small>${esc(p.category)} · ${api.money(p.price)}${p.trackStock?` · ${p.stock} em estoque`:''}</small></span><div class="qty-actions"><button type="button" data-draft-remove="${esc(p.id)}" ${!orderDraft[p.id]?'disabled':''} aria-label="Diminuir ${esc(p.name)}">−</button><b>${orderDraft[p.id]||0}</b><button type="button" data-draft-add="${esc(p.id)}" ${p.trackStock&&p.stock<=(orderDraft[p.id]||0)?'disabled':''} aria-label="Adicionar ${esc(p.name)}">+</button></div></div>`).join(''):'<div class="illustrated-empty">Cadastre produtos ou ajuste sua busca para lançar pedidos.</div>'}</div><div class="send-bar"><div><small>Novos itens</small><b>${api.money(draftTotal)}</b></div><button class="primary" id="sendOrderBtn" ${!Object.keys(orderDraft).length?'disabled':''}>Enviar pedido à cozinha →</button></div></div>`:''}
   <div class="order-history"><div class="subsection-heading"><h3>Pedidos lançados</h3><small>${o.batches.length} envio(s)</small></div>${batches||'<div class="illustrated-empty">Nenhum pedido enviado nesta comanda.</div>'}</div>
-  <div class="order-checkout"><div class="checkout-total"><span>Total da comanda</span><strong>${api.money(orderTotal(o))}</strong></div>${editable?`<div class="checkout-action"><label>Forma de pagamento<select id="orderPayment"><option>Dinheiro</option><option>PIX</option><option>Débito</option><option>Crédito</option></select></label><button class="primary" id="closeOrderBtn" ${!o.batches.length?'disabled':''}>Fechar e receber</button></div>`:`<p>Fechada em ${dateText(o.closedAt)} · ${esc(o.payment||'Pagamento não informado')}</p>`}</div>`;
+  <div class="order-checkout"><div class="checkout-total"><span>Total da comanda</span><strong>${api.money(orderTotal(o))}</strong></div>${editable?`<div class="checkout-action checkout-action-modern"><div class="checkout-payment"><div class="payment-title"><span>Forma de pagamento</span><small>Selecione antes de finalizar</small></div><div class="payment-options compact" role="radiogroup" aria-label="Forma de pagamento da comanda">${paymentButtons(orderPayment)}</div></div><button class="primary close-order-button" id="closeOrderBtn" ${!o.batches.length?'disabled':''}>Fechar e receber</button></div>`:`<p>Fechada em ${dateText(o.closedAt)} · ${esc(o.payment||'Pagamento não informado')}</p>`}</div>`;
   // Campos gerados dinamicamente usam delegação para preservar os eventos do celular.
   el.querySelector('#orderProductSearch')?.addEventListener('input',e=>{const pos=e.target.selectionStart;menuSearch=e.target.value.toLowerCase();renderOrderDetail();const input=el.querySelector('#orderProductSearch');if(input){input.focus();input.setSelectionRange(pos,pos)}});
   el.querySelector('#orderProductCategory')?.addEventListener('change',e=>{menuCategory=e.target.value;renderOrderDetail()});
@@ -141,8 +153,7 @@ function renderKitchen(){
   document.getElementById('kitchenBoard').innerHTML=filtered.length?filtered.map(({o,b})=>`<article class="kitchen-ticket status-${b.status}"><div class="kitchen-ticket-head"><span class="order-num">#${esc(o.number)}</span>${pill(batchStatus[b.status]?.[0]||b.status,batchStatus[b.status]?.[1])}</div><h3>${esc(o.customer||`Mesa ${o.table}`)}</h3><small>${esc(o.table?`Mesa ${o.table} · `:'')}${esc(o.waiter||'Balcão')} · ${dateText(b.createdAt)}</small><div class="ticket-lines">${b.items.map(i=>`<div><b>${i.qty}×</b><span>${esc(i.name)} <small>· ${esc(i.area)}</small></span></div>`).join('')}</div>${next[b.status]?`<button class="secondary kitchen-next" data-batch-id="${esc(b.id)}" data-kitchen-status="${next[b.status][1]}">${next[b.status][0]} →</button>`:'<div class="ticket-finished">✓ Entregue</div>'}</article>`).join(''):'<div class="illustrated-empty full-width">Nenhum pedido nesta etapa. Novos pedidos aparecem assim que o garçom envia a comanda.</div>';
 }
 function renderReports(){
-  document.getElementById('reportsFrom').value=reportFrom;
-  document.getElementById('reportsTo').value=reportTo;
+  syncReportRange();
   const sales=db().sales.filter(s=>inRange(s.createdAt)),turnover=sum(sales,s=>Number(s.total||0)),cost=sum(sales,s=>Number(s.cost||0));
   const items=new Map(),byDay=new Map();
   for(const sale of sales){
