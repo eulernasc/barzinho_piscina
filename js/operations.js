@@ -42,6 +42,7 @@ export function initOperations(apiRef){
     if(b.dataset.orderPayment){orderPayment=b.dataset.orderPayment;renderOrderPaymentState();return}
     if(b.dataset.draftAdd)updateDraft(b.dataset.draftAdd,1);
     if(b.dataset.draftRemove)updateDraft(b.dataset.draftRemove,-1);
+    if(b.dataset.draftClear)updateDraft(b.dataset.draftClear,-(orderDraft[b.dataset.draftClear]||0));
     if(b.id==='sendOrderBtn')sendOrder();
     if(b.id==='closeOrderBtn')closeOrder();
     if(b.id==='deleteOrderBtn')deleteOrder();
@@ -76,7 +77,31 @@ function updateDraft(id,delta){
   // Estoque é debitado ao enviar o pedido, não ao abrir a comanda.
   if(delta>0&&p.trackStock&&newQty>Number(p.stock)){api.toast('Estoque insuficiente para esse produto.');return}
   if(newQty)orderDraft[id]=newQty;else delete orderDraft[id];
-  renderOrderDetail()
+  // Keep the catalog DOM (and its scroll position) intact when quantities change.
+  updateDraftDisplay();
+}
+function draftItems(){return Object.entries(orderDraft).map(([id,qty])=>({product:db().products.find(p=>p.id===id),qty})).filter(i=>i.product&&i.qty>0)}
+function updateDraftDisplay(){
+  const root=document.getElementById('orderDetail'),list=root.querySelector('#draftSummaryList');
+  if(!list)return;
+  const pageX=window.scrollX,pageY=window.scrollY,summaryTop=list.scrollTop;
+  const active=document.activeElement;
+  const focusAction=active?.closest('#draftSummaryList')?['draftAdd','draftRemove','draftClear'].find(k=>active.dataset[k]):null;
+  const focusId=focusAction?active.dataset[focusAction]:null;
+  const items=draftItems(),qty=sum(items,i=>i.qty),total=sum(items,i=>i.qty*Number(i.product.price));
+  root.querySelectorAll('.order-menu .menu-item').forEach(row=>{
+    const add=row.querySelector('[data-draft-add]'),remove=row.querySelector('[data-draft-remove]');
+    const p=db().products.find(p=>p.id===add.dataset.draftAdd),count=orderDraft[p.id]||0;
+    row.querySelector('.qty-actions b').textContent=count;
+    remove.disabled=!count;add.disabled=Boolean(p.trackStock&&count>=Number(p.stock));
+  });
+  list.innerHTML=items.length?items.map(({product:p,qty})=>`<div class="draft-summary-item"><div class="draft-summary-product"><strong>${esc(p.name)}</strong><small>${qty} × ${api.money(p.price)} · Subtotal <b>${api.money(qty*p.price)}</b></small></div><div class="qty-actions draft-summary-actions"><button type="button" data-draft-remove="${esc(p.id)}" aria-label="Diminuir ${esc(p.name)} no resumo">−</button><b>${qty}</b><button type="button" data-draft-add="${esc(p.id)}" ${p.trackStock&&qty>=Number(p.stock)?'disabled':''} aria-label="Adicionar ${esc(p.name)} no resumo">+</button><button type="button" class="draft-remove-item" data-draft-clear="${esc(p.id)}" aria-label="Remover ${esc(p.name)} do resumo">×</button></div></div>`).join(''):'<p class="draft-empty">Nenhum item selecionado. Escolha os produtos acima.</p>';
+  root.querySelector('#draftSummaryCount').textContent=`${qty} ${qty===1?'item':'itens'}`;
+  root.querySelector('#draftTotal').textContent=api.money(total);
+  root.querySelector('#sendOrderBtn').disabled=!items.length;
+  if(focusAction){const next=[...list.querySelectorAll('button')].find(b=>b.dataset[focusAction]===focusId);(next||root.querySelector('#draftSummaryTitle')).focus({preventScroll:true});}
+  list.scrollTop=summaryTop;
+  window.scrollTo(pageX,pageY);
 }
 function sendOrder(){
   const o=selectedOrder();if(!o||o.status!=='open')return;
@@ -183,9 +208,10 @@ function renderOrderDetail(){
   const products=d.products.filter(p=>(!menuSearch||p.name.toLowerCase().includes(menuSearch))&&(!menuCategory||p.category===menuCategory));
   const draftTotal=sum(Object.entries(orderDraft),([id,qty])=>qty*(d.products.find(p=>p.id===id)?.price||0));
   el.innerHTML=`<div class="order-detail-head"><div><button class="back-orders" id="backOrdersBtn">← Voltar às comandas</button><span class="mini-label">${o.status==='open'?'Atendimento em andamento':'Venda concluída'}</span><h2>${esc(o.customer || (o.table ? `Mesa ${o.table}` : 'Comanda'))} <span>#${esc(o.number)}</span></h2><p>${esc([o.table?`Mesa ${o.table}`:'',o.waiter?`Garçom: ${o.waiter}`:'',`Aberta: ${dateText(o.createdAt)}`].filter(Boolean).join(' · '))}</p></div><div class="order-head-actions">${pill(o.status==='open'?'Aberta':'Fechada',o.status==='open'?'progress':'neutral')}<button type="button" class="danger-outline" id="deleteOrderBtn" ${editable?'aria-label="Cancelar comanda"':'aria-label="Excluir comanda"'}>${editable?'Cancelar comanda':'Excluir comanda'}</button></div></div>
-  ${editable?`<div class="order-composer"><div class="subsection-heading"><h3>Adicionar produtos</h3><small>Itens só entram na conta após o envio</small></div><div class="menu-filter"><input aria-label="Buscar no cardápio" id="orderProductSearch" placeholder="Buscar no cardápio..." value="${esc(menuSearch)}"><select aria-label="Filtrar categoria" id="orderProductCategory"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${esc(c)}" ${c===menuCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="order-menu">${products.length?products.map(p=>`<div class="menu-item"><span><strong>${esc(p.name)}</strong><small>${esc(p.category)} · ${api.money(p.price)}${p.trackStock?` · ${p.stock} em estoque`:''}</small></span><div class="qty-actions"><button type="button" data-draft-remove="${esc(p.id)}" ${!orderDraft[p.id]?'disabled':''} aria-label="Diminuir ${esc(p.name)}">−</button><b>${orderDraft[p.id]||0}</b><button type="button" data-draft-add="${esc(p.id)}" ${p.trackStock&&p.stock<=(orderDraft[p.id]||0)?'disabled':''} aria-label="Adicionar ${esc(p.name)}">+</button></div></div>`).join(''):'<div class="illustrated-empty">Cadastre produtos ou ajuste sua busca para lançar pedidos.</div>'}</div><div class="send-bar"><div><small>Novos itens</small><b>${api.money(draftTotal)}</b></div><button class="primary" id="sendOrderBtn" ${!Object.keys(orderDraft).length?'disabled':''}>Enviar pedido à cozinha →</button></div></div>`:''}
+  ${editable?`<div class="order-composer"><div class="subsection-heading"><h3>Adicionar produtos</h3><small>Itens só entram na conta após o envio</small></div><div class="menu-filter"><input aria-label="Buscar no cardápio" id="orderProductSearch" placeholder="Buscar no cardápio..." value="${esc(menuSearch)}"><select aria-label="Filtrar categoria" id="orderProductCategory"><option value="">Todas as categorias</option>${cats.map(c=>`<option value="${esc(c)}" ${c===menuCategory?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="order-menu">${products.length?products.map(p=>`<div class="menu-item"><span><strong>${esc(p.name)}</strong><small>${esc(p.category)} · ${api.money(p.price)}${p.trackStock?` · ${p.stock} em estoque`:''}</small></span><div class="qty-actions"><button type="button" data-draft-remove="${esc(p.id)}" ${!orderDraft[p.id]?'disabled':''} aria-label="Diminuir ${esc(p.name)}">−</button><b>${orderDraft[p.id]||0}</b><button type="button" data-draft-add="${esc(p.id)}" ${p.trackStock&&p.stock<=(orderDraft[p.id]||0)?'disabled':''} aria-label="Adicionar ${esc(p.name)}">+</button></div></div>`).join(''):'<div class="illustrated-empty">Cadastre produtos ou ajuste sua busca para lançar pedidos.</div>'}</div><section class="draft-summary" aria-labelledby="draftSummaryTitle"><div class="draft-summary-head"><h3 id="draftSummaryTitle" tabindex="-1">Itens selecionados</h3><span id="draftSummaryCount" class="draft-summary-count" aria-live="polite">0 itens</span></div><div id="draftSummaryList" class="draft-summary-list"></div></section><div class="send-bar"><div><small>Total dos novos itens</small><b id="draftTotal">${api.money(draftTotal)}</b></div><button class="primary" id="sendOrderBtn" ${!Object.keys(orderDraft).length?'disabled':''}>Enviar pedido à cozinha →</button></div></div>`:''}
   <div class="order-history"><div class="subsection-heading"><h3>Pedidos lançados</h3><small>${o.batches.length} envio(s)</small></div>${batches||'<div class="illustrated-empty">Nenhum pedido enviado nesta comanda.</div>'}</div>
   <div class="order-checkout"><div class="checkout-total"><span>Total da comanda</span><strong>${api.money(orderTotal(o))}</strong></div>${editable?`<div class="checkout-action checkout-action-modern"><div class="checkout-payment"><div class="payment-title"><span>Forma de pagamento</span><small>Selecione antes de finalizar</small></div><div class="payment-options compact" role="radiogroup" aria-label="Forma de pagamento da comanda">${paymentButtons(orderPayment)}</div></div><button class="primary close-order-button" id="closeOrderBtn" ${!o.batches.length?'disabled':''}>Fechar e receber</button></div>`:`<p>Fechada em ${dateText(o.closedAt)} · ${esc(o.payment||'Pagamento não informado')}</p>`}</div>`;
+  if(editable)updateDraftDisplay();
   // Campos gerados dinamicamente usam delegação para preservar os eventos do celular.
   el.querySelector('#orderProductSearch')?.addEventListener('input',e=>{const pos=e.target.selectionStart;menuSearch=e.target.value.toLowerCase();renderOrderDetail();const input=el.querySelector('#orderProductSearch');if(input){input.focus();input.setSelectionRange(pos,pos)}});
   el.querySelector('#orderProductCategory')?.addEventListener('change',e=>{menuCategory=e.target.value;renderOrderDetail()});
@@ -221,3 +247,5 @@ function exportSales(){
   const csv='\ufeff'+rows.map(row=>row.map(safe).join(';')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`barzinho_vendas_${todayIso()}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
+
+

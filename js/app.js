@@ -1,4 +1,4 @@
-import {initOperations,renderOperations} from './operations.js?v=20261028-exclusao';
+import {initOperations,renderOperations} from './operations.js?v=20261029-itens3';
 const DB_KEY='barzinhoPiscinaDB_v1';
 const emptyDb=()=>({products:[],sales:[],movements:[],purchases:[],stockAdjustments:[],orders:[],orderCounter:1000});
 let db=loadDb();let cart=[];let purchaseDraft=[];
@@ -87,3 +87,5 @@ initOperations({getDb:()=>db,saveDb,renderAll,toast,money,uid,el,setView});
 function syncFinanceRange(changed){const from=el('financeFrom'),to=el('financeTo');if(changed==='from'&&from.value&&to.value&&from.value>to.value)to.value=from.value;if(changed==='to'&&from.value&&to.value&&to.value<from.value)from.value=to.value;to.min=from.value||'';from.max=to.value||'';renderFinancial()}
 el('financeFrom').addEventListener('change',()=>syncFinanceRange('from'));el('financeTo').addEventListener('change',()=>syncFinanceRange('to'));el('financeReset').addEventListener('click',()=>{el('financeFrom').value='';el('financeTo').value='';el('financeFrom').max='';el('financeTo').min='';renderFinancial()});
 const updateClock=()=>el('clock').textContent=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});updateClock();setInterval(updateClock,1000);setPdvPayment('Dinheiro');renderAll();
+
+

@@ -234,7 +234,8 @@ thead .sticky-actions-col{z-index:4;background:#f8fbfd}
 /* Comandas: resumo dos itens selecionados antes do envio */
 .draft-summary{margin-top:12px;border:1px solid #d8e7f1;border-radius:13px;background:#fff;overflow:hidden;box-shadow:0 5px 16px rgba(8,35,75,.025)}
 .draft-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid #e8eff5;background:linear-gradient(180deg,#fbfdff,#f5f9fc)}
-.draft-summary-head h4{margin:3px 0 0;font-size:14px;color:#17344f}
+.draft-summary-head h3{margin:0;font-size:14px;color:#17344f}
+.draft-empty{margin:0;padding:14px;color:#708198;font-size:12px}
 .draft-summary-count{font-size:11px;font-weight:850;color:#07649c;background:#e8f6fc;padding:6px 9px;border-radius:999px;white-space:nowrap}
 .draft-summary-list{max-height:196px;overflow:auto;overscroll-behavior:contain}
 .draft-summary-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border-bottom:1px solid #edf2f6}
@@ -260,3 +261,5 @@ thead .sticky-actions-col{z-index:4;background:#f8fbfd}
   .draft-summary-actions button{width:34px;height:34px}
   .draft-summary-actions .draft-remove-item{width:34px}
 }
+
+
