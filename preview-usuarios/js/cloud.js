@@ -5,7 +5,7 @@ import {
   createUserWithEmailAndPassword, deleteUser
 } from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js';
 import {
-  getFirestore, doc, collection, getDocFromServer, getDocsFromServer,
+  initializeFirestore, doc, collection, getDocFromServer, getDocsFromServer,
   getDocs, setDoc, updateDoc, onSnapshot, runTransaction, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js';
 
@@ -38,17 +38,34 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     field('loginScreen').hidden=false;
     return {saveDb:async()=>{throw Error('Firebase ainda não configurado.')},isActive:()=>false};
   }
-  const app=initializeApp(firebaseConfig),auth=getAuth(app),firestore=getFirestore(app);
+  const app=initializeApp(firebaseConfig),auth=getAuth(app);
+  // Long-polling avoids WebChannel connections that can stall behind some proxies.
+  const firestore=initializeFirestore(app,{experimentalForceLongPolling:true});
   const metaRef=doc(firestore,'barzinho','principal');
   let saved=emptyDb(),revision=0,current=null,saving=false,ready=false;
   let unlistenRole=()=>{},unlistenMeta=()=>{};
   let adminListBusy=false;
+  let authCheckSerial=0;
+  function timeoutAfter(promise,label,ms=15000){
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_,reject)=>{timer=setTimeout(()=>{
+        reject(new Error(label+' não respondeu em '+Math.round(ms/1000)+' segundos. Verifique sua conexão com o Firestore e tente novamente.'));
+      },ms);})
+    ]).finally(()=>clearTimeout(timer));
+  }
+  function showRetry(message){
+    setMessage('loginStatus',message);
+    const button=field('retryAuthButton');
+    if(button)button.hidden=false;
+  }
 
   async function readCloud() {
-    const [meta,...snapshots]=await Promise.all([
+    const [meta,...snapshots]=await timeoutAfter(Promise.all([
       getDocFromServer(metaRef),
       ...entities.map(k=>getDocsFromServer(collection(firestore,'barzinho','principal',k)))
-    ]);
+    ]),'Carregamento dos dados',18000);
     const next=emptyDb();
     entities.forEach((key,index)=>{next[key]=snapshots[index].docs.map(d=>d.data().value).filter(Boolean)});
     revision=meta.exists()?Number(meta.data().revision||0):0;
@@ -130,6 +147,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
 
   async function showAuthorized(user,record){
     current={uid:user.uid,email:user.email,...record};
+    setMessage('loginStatus','Conta autorizada. Carregando dados do bar...');
     await readCloud();
     if(!current)return;
     ready=true;
@@ -159,19 +177,40 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     field('usersNav').hidden=true;field('importLocalButton').hidden=true;
     revoked();
   }
-  onAuthStateChanged(auth,async user=>{
+  async function verifyAuthorization(user){
+    const serial=++authCheckSerial;
     exit();
-    if(!user){setMessage('loginStatus','Entre com sua conta Google autorizada ou com o e-mail e senha cadastrados pelo administrador.');return;}
-    setMessage('loginStatus','Verificando autorização...');
+    const retry=field('retryAuthButton');
+    if(retry)retry.hidden=true;
+    if(!user){
+      setMessage('loginStatus','Entre com a conta Google autorizada ou com e-mail e senha.');
+      return;
+    }
+    setMessage('loginStatus','Verificando seu perfil de acesso no Firestore...');
     try{
-      const record=await getDocFromServer(doc(firestore,'users',user.uid));
-      if(!record.exists()||record.data().active!==true) {
-        setMessage('loginStatus','Conta sem autorização ou bloqueada. Procure o administrador.');
-        await signOut(auth);return;
+      const record=await timeoutAfter(
+        getDocFromServer(doc(firestore,'users',user.uid)),
+        'Verificação do seu cadastro',15000
+      );
+      if(serial!==authCheckSerial)return;
+      if(!record.exists()||record.data().active!==true){
+        showRetry('A conta está autenticada, mas não tem um perfil ativo no Firestore. Confirme o UID em users/ e tente novamente.');
+        return;
       }
       await showAuthorized(user,record.data());
+      if(serial!==authCheckSerial)return;
       setMessage('loginStatus','');
-    }catch(e){setMessage('loginStatus','Falha na verificação: '+humanError(e));await signOut(auth);}
+    }catch(e){
+      if(serial!==authCheckSerial)return;
+      // Keep the Firebase session alive; a transient Firestore failure should
+      // not force a new Google popup.
+      showRetry('Não foi possível concluir o acesso: '+humanError(e));
+    }
+  }
+  onAuthStateChanged(auth,user=>verifyAuthorization(user));
+  field('retryAuthButton').addEventListener('click',()=>{
+    if(auth.currentUser)verifyAuthorization(auth.currentUser);
+    else setMessage('loginStatus','Selecione Entrar com Google para autenticar novamente.');
   });
   field('loginForm').addEventListener('submit',login);
   field('googleLoginButton').addEventListener('click',loginGoogle);
