@@ -1,5 +1,6 @@
 // Operação local para testes. A conexão entre dispositivos exige Firebase com autenticação e regras.
 let api;
+let criticalSaving=false;
 let selectedOrderId = null;
 let orderFilter = 'open';
 let kitchenFilter = 'active';
@@ -19,7 +20,7 @@ function db(){return api.getDb()}
 function orders(){return db().orders || []}
 function orderTotal(order){return sum(order.batches||[], b => sum(b.items || [],i=>i.qty*i.unitPrice))}
 function orderQty(order){return sum(order.batches||[], b => sum(b.items || [],i=>i.qty))}
-function save(){api.saveDb();api.renderAll()}
+async function save(){await api.saveDb();api.renderAll()}
 function todayIso(){return localDate(new Date())}
 function orderLabel(o){return o?.customer || (o?.table ? `Mesa ${o.table}` : `Comanda #${o?.number||''}`)}
 function openOrderDialog(){const form=document.getElementById('orderForm'),dialog=document.getElementById('orderDialog');form?.reset();if(dialog&&!dialog.open){dialog.showModal();setTimeout(()=>document.getElementById('orderCustomer')?.focus(),0)}}
@@ -57,18 +58,26 @@ export function initOperations(apiRef){
   document.getElementById('reportsReset').addEventListener('click',()=>{reportFrom='';reportTo='';syncReportRange();renderReports()});
   document.getElementById('exportSalesBtn').addEventListener('click',exportSales);
 }
-function createOrder(e){
+async function createOrder(e){
   e.preventDefault();
+  if(criticalSaving)return;
   const customer=document.getElementById('orderCustomer').value.trim().slice(0,80);
   const table=document.getElementById('orderTable').value.trim().slice(0,40);
   const waiter=document.getElementById('orderWaiter').value.trim().slice(0,80);
   const d=db();
-  const order={id:api.uid('cmd'),number:String((d.orderCounter || 1000)+1),customer,table,waiter,createdAt:new Date().toISOString(),status:'open',batches:[]};
+  const order={id:api.uid('cmd'),number:String((d.orderCounter||1000)+1),customer,table,waiter,createdAt:new Date().toISOString(),status:'open',batches:[]};
+  criticalSaving=true;
   d.orderCounter=Number(order.number);d.orders.unshift(order);
-  selectedOrderId=order.id;orderFilter='open';orderDraft={};orderPayment='Dinheiro';
-  dismissOrderDialog();save();
-  api.setView('comandas');api.toast(`Comanda #${order.number} aberta.`)
+  api.toast('Salvando comanda no Firebase...');
+  try {
+    await save();
+    selectedOrderId=order.id;orderFilter='open';orderDraft={};orderPayment='Dinheiro';
+    dismissOrderDialog();api.setView('comandas');
+    api.toast('Comanda #'+order.number+' confirmada no Firebase.');
+  }catch(e){api.toast('Comanda NÃO aberta: '+e.message);}
+  finally{criticalSaving=false;}
 }
+
 function selectedOrder(){return orders().find(o=>o.id===selectedOrderId)}
 function updateDraft(id,delta){
   const order=selectedOrder(),p=db().products.find(x=>x.id===id);
@@ -103,16 +112,29 @@ function updateDraftDisplay(){
   list.scrollTop=summaryTop;
   window.scrollTo(pageX,pageY);
 }
-function sendOrder(){
+async function sendOrder(){
+  if(criticalSaving)return;
   const o=selectedOrder();if(!o||o.status!=='open')return;
-  const d=db(),items=Object.entries(orderDraft).map(([id,qty])=>{const p=d.products.find(x=>x.id===id);return p?{productId:id,name:p.name,qty,unitPrice:Number(p.price),unitCost:Number(p.cost),area:p.area||(/bebida|cerveja|drink|refrigerante|água/i.test(p.category)?'Bar':'Cozinha')}:null}).filter(Boolean);
+  const d=db(),items=Object.entries(orderDraft).map(([id,qty])=>{
+    const p=d.products.find(x=>x.id===id);
+    return p?{productId:id,name:p.name,qty,unitPrice:Number(p.price),unitCost:Number(p.cost),
+      area:p.area||(/bebida|cerveja|drink|refrigerante|água/i.test(p.category)?'Bar':'Cozinha')}:null;
+  }).filter(Boolean);
   if(!items.length){api.toast('Escolha pelo menos um produto.');return}
-  for(const i of items){const p=d.products.find(x=>x.id===i.productId);if(p.trackStock&&p.stock<i.qty){api.toast(`Estoque insuficiente: ${i.name}`);return}}
+  for(const i of items){const p=d.products.find(x=>x.id===i.productId);if(p.trackStock&&p.stock<i.qty){api.toast('Estoque insuficiente: '+i.name);return}}
+  criticalSaving=true;
   const now=new Date().toISOString();
   items.forEach(i=>{const p=d.products.find(x=>x.id===i.productId);if(p.trackStock)p.stock-=i.qty});
   o.batches.push({id:api.uid('lot'),items,status:'new',createdAt:now});
-  orderDraft={};save();api.toast('Pedido enviado para o painel da cozinha.');
+  api.toast('Salvando pedido no Firebase...');
+  try{
+    await save();
+    orderDraft={};api.renderAll();
+    api.toast('Pedido confirmado no Firebase e enviado à cozinha.');
+  }catch(e){api.toast('Pedido NÃO enviado: '+e.message+'. Confira antes de tentar novamente.')}
+  finally{criticalSaving=false;}
 }
+
 function reconcileExistingOrderSales(){
   let changed=false;
   for(const o of orders()){
@@ -122,7 +144,7 @@ function reconcileExistingOrderSales(){
     if(o.status==='closed'&&(o.batches||[]).length){syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment:o.payment||'Não informado'});changed=true}
     else if(o.status==='open'&&(o.batches||[]).some(b=>b.status==='delivered')){syncOrderFinancialSale(o,{includeAll:false,finalize:false});changed=true}
   }
-  if(changed)api.saveDb();
+  if(changed)api.saveDb().catch(e=>api.toast('Falha ao reconciliar vendas: '+e.message));
 }
 function orderSaleItems(o,includeAll=false){return (o.batches||[]).filter(b=>includeAll||b.status==='delivered').flatMap(b=>b.items.map(i=>({productId:i.productId,name:i.name,immediateQty:i.qty,tokenQty:0,qty:i.qty,unitPrice:Number(i.unitPrice||0),unitCost:Number(i.unitCost||0),batchId:b.id})))}
 function syncOrderFinancialSale(o,{includeAll=false,finalize=false,payment=null}={}){
@@ -135,40 +157,66 @@ function syncOrderFinancialSale(o,{includeAll=false,finalize=false,payment=null}
   if(finalize){sale.payment=payment||o.payment||'Não informado';sale.financialStatus='finalized';sale.receivedAt=now}else{sale.payment='Pendente';sale.financialStatus='pending'}
   return sale
 }
-function closeOrder(){
+async function closeOrder(){
+  if(criticalSaving)return;
   const o=selectedOrder();if(!o||o.status!=='open')return;
   if(!o.batches.length){api.toast('Envie pelo menos um pedido antes de fechar.');return}
   if(o.batches.some(b=>b.status!=='delivered')&&!confirm('Há itens ainda não marcados como entregues. Deseja fechar a comanda mesmo assim?'))return;
-  if(o.financialDeletedAt){if(!confirm('O lançamento anterior foi excluído. Fechar e receber criará uma nova venda com todos os itens. Continuar?'))return;delete o.financialDeletedAt;}
+  if(o.financialDeletedAt){
+    if(!confirm('O lançamento anterior foi excluído. Fechar e receber criará uma nova venda com todos os itens. Continuar?'))return;
+    delete o.financialDeletedAt;
+  }
+  criticalSaving=true;
   const payment=orderPayment,now=new Date().toISOString();
   o.status='closed';o.closedAt=now;o.payment=payment;
-  syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment});orderDraft={};save();api.toast(`Comanda #${o.number} fechada. Financeiro atualizado sem duplicar a venda.`)
+  syncOrderFinancialSale(o,{includeAll:true,finalize:true,payment});
+  api.toast('Confirmando fechamento e financeiro no Firebase...');
+  try{
+    await save();
+    orderDraft={};api.renderAll();
+    api.toast('Comanda #'+o.number+' fechada e venda confirmada no Firebase.');
+  }catch(e){api.toast('Comanda NÃO fechada: '+e.message)}
+  finally{criticalSaving=false;}
 }
-function deleteOrder(orderId=selectedOrderId){
+
+async function deleteOrder(orderId=selectedOrderId){
+  if(criticalSaving)return;
   const o=orders().find(x=>x.id===orderId);if(!o)return;
   const d=db(),linkedSales=d.sales.filter(s=>(o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id));
   const qty=orderQty(o),parts=[];
-  if(qty)parts.push(`${qty} item(ns) lançado(s) também sairão da cozinha/histórico da comanda.`);
+  if(qty)parts.push(qty+' item(ns) lançado(s) também sairão da cozinha/histórico da comanda.');
   if(linkedSales.length)parts.push('O lançamento financeiro vinculado também será removido.');
   if(qty)parts.push('O estoque NÃO será devolvido automaticamente; se necessário, faça um ajuste de estoque depois.');
   if(!qty&&!linkedSales.length)parts.push('A comanda sairá das abertas sem gerar venda, lançamento financeiro ou histórico e sem alterar o estoque.');
-  const detail=parts.length?`\n\n${parts.join('\n')}`:'';
-  if(!confirm(`${o.status==='open'?'Cancelar':'Excluir'} a comanda #${o.number}${o.customer?` de ${o.customer}`:''}?${detail}`))return;
+  const detail=parts.length?'\n\n'+parts.join('\n'):'';
+  if(!confirm((o.status==='open'?'Cancelar':'Excluir')+' a comanda #'+o.number+(o.customer?' de '+o.customer:'')+'?'+detail))return;
+  criticalSaving=true;
   d.sales=d.sales.filter(s=>!((o.saleId&&s.id===o.saleId)||(s.source==='comanda'&&s.orderId===o.id)));
   d.orders=d.orders.filter(x=>x.id!==o.id);
-  if(selectedOrderId===o.id){selectedOrderId=null;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro'}
-  save();
-  api.toast(`Comanda #${o.number} excluída.`)
+  try{
+    await save();
+    if(selectedOrderId===o.id){selectedOrderId=null;orderDraft={};menuSearch='';menuCategory='';orderPayment='Dinheiro'}
+    api.renderAll();api.toast('Comanda #'+o.number+' excluída no Firebase.');
+  }catch(e){api.toast('Exclusão NÃO confirmada: '+e.message)}
+  finally{criticalSaving=false;}
 }
-function updateKitchenStatus(batchId,next){
+
+async function updateKitchenStatus(batchId,next){
+  if(criticalSaving)return;
   const allowed={new:'preparing',preparing:'ready',ready:'delivered'};
   const o=orders().find(x=>x.batches.some(b=>b.id===batchId));
   const b=o?.batches.find(x=>x.id===batchId);
   if(!b||allowed[b.status]!==next)return;
-  const now=new Date().toISOString();b.status=next;b[`${next}At`]=now;
+  criticalSaving=true;
+  const now=new Date().toISOString();b.status=next;b[next+'At']=now;
   if(next==='delivered')syncOrderFinancialSale(o,{includeAll:o.status==='closed',finalize:o.status==='closed',payment:o.payment});
-  save();api.toast(next==='delivered'?'Pedido entregue e lançado no financeiro.':'Etapa atualizada.')
+  try{
+    await save();
+    api.toast(next==='delivered'?'Entrega confirmada e registrada no financeiro.':'Etapa confirmada no Firebase.');
+  }catch(e){api.toast('Alteração NÃO salva: '+e.message)}
+  finally{criticalSaving=false;}
 }
+
 export function renderOperations(){if(!api)return;renderDashboard();renderOrders();renderKitchen();renderReports()}
 function renderDashboard(){
   const d=db(),salesToday=d.sales.filter(s=>localDate(s.createdAt)===todayIso());
