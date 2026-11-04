@@ -16,12 +16,14 @@
       <img src="assets/logo.svg" alt="Barzinho da Piscina" class="login-logo">
       <span class="mini-label">ACESSO DA EQUIPE</span>
       <h1>Barzinho da Piscina</h1>
-      <p>Faça login com o e-mail e a senha cadastrados pelo administrador.</p>
+      <p>Entre com Google usando sua conta autorizada, ou utilize o e-mail e a senha cadastrados pelo administrador.</p>
       <form id="loginForm" class="login-form">
         <label>E-mail<input id="loginEmail" type="email" autocomplete="username" required></label>
         <label>Senha<input id="loginPassword" type="password" autocomplete="current-password" required></label>
         <button id="loginSubmit" type="submit" class="primary">Entrar</button>
       </form>
+      <div class="login-divider" aria-hidden="true"><span>ou</span></div>
+      <button id="googleLoginButton" class="google-login" type="button">Entrar com Google</button>
       <p id="loginStatus" role="status" aria-live="polite">Verificando configuração...</p>
     </section>
   </main>
