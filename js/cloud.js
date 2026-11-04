@@ -1,7 +1,7 @@
 import {firebaseConfig} from './firebase-config.js';
 import {initializeApp, deleteApp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js';
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut,
   createUserWithEmailAndPassword, deleteUser
 } from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js';
 import {
@@ -20,6 +20,10 @@ const humanError = e => {
   if (code === 'auth/invalid-credential') return 'E-mail ou senha incorretos.';
   if (code === 'auth/email-already-in-use') return 'Este e-mail já está cadastrado no Firebase.';
   if (code === 'auth/weak-password') return 'Senha muito fraca. Use pelo menos 8 caracteres.';
+  if (code === 'auth/popup-blocked') return 'O navegador bloqueou a janela do Google. Habilite pop-ups e tente novamente.';
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return 'Entrada com Google cancelada.';
+  if (code === 'auth/unauthorized-domain') return 'Domínio não autorizado. Adicione o endereço do site em Authentication > Configurações > Domínios autorizados.';
+  if (code === 'auth/operation-not-allowed') return 'Provedor de login desativado no Firebase Authentication.';
   if (code === 'permission-denied') return 'Permissão negada. Verifique seu cadastro e as regras do Firestore.';
   if (code === 'unavailable') return 'Sem conexão com o banco. Nada foi confirmado.';
   return e?.message||'Não foi possível completar a operação.';
@@ -109,6 +113,21 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     finally {submit.disabled=false;}
   }
 
+  async function loginGoogle(){
+    const submit=field('googleLoginButton');
+    if(submit.disabled)return;
+    submit.disabled=true;
+    setMessage('loginStatus','Entrando com Google...');
+    try{
+      const provider=new GoogleAuthProvider();
+      provider.setCustomParameters({prompt:'select_account'});
+      // O Firebase autentica a identidade; somente users/{uid}.active=true
+      // concede acesso aos dados do bar pelas regras do Firestore.
+      await signInWithPopup(auth,provider);
+    }catch(e){setMessage('loginStatus',humanError(e))}
+    finally{submit.disabled=false}
+  }
+
   async function showAuthorized(user,record){
     current={uid:user.uid,email:user.email,...record};
     await readCloud();
@@ -142,7 +161,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
   }
   onAuthStateChanged(auth,async user=>{
     exit();
-    if(!user){setMessage('loginStatus','Entre com o e-mail e a senha cadastrados pelo administrador.');return;}
+    if(!user){setMessage('loginStatus','Entre com sua conta Google autorizada ou com o e-mail e senha cadastrados pelo administrador.');return;}
     setMessage('loginStatus','Verificando autorização...');
     try{
       const record=await getDocFromServer(doc(firestore,'users',user.uid));
@@ -155,6 +174,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     }catch(e){setMessage('loginStatus','Falha na verificação: '+humanError(e));await signOut(auth);}
   });
   field('loginForm').addEventListener('submit',login);
+  field('googleLoginButton').addEventListener('click',loginGoogle);
   field('logoutButton').addEventListener('click',()=>signOut(auth));
 
   async function renderUsers(){
