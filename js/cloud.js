@@ -59,6 +59,26 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     setMessage('loginStatus',message);
     const button=field('retryAuthButton');
     if(button)button.hidden=false;
+    const switchButton=field('switchGoogleAccount');
+    if(switchButton)switchButton.hidden=false;
+  }
+  function showAuthDiagnostics(user,profile){
+    const wrap=field('authDiagnostics');
+    if(!wrap)return;
+    if(!user){wrap.hidden=true;return;}
+    wrap.hidden=false;
+    const provider=user.providerData?.map(p=>p.providerId).join(', ')||'Firebase';
+    const status=profile===undefined?'Aguardando verificação':!profile?'Documento users/ não encontrado':profile.active===true?'Ativo':'Documento encontrado, mas active não é true';
+    const email=user.email||'(sem e-mail)';
+    const diagnostics=['Projeto: '+firebaseConfig.projectId,'E-mail autenticado: '+email,'UID autenticado: '+user.uid,'Provedor: '+provider,'Perfil Firestore: '+status].join('\n');
+    wrap.textContent=diagnostics;
+    const copy=field('copyAuthDiagnostics');
+    if(copy){
+      copy.hidden=false;
+      copy.onclick=()=>{
+        navigator.clipboard?.writeText(diagnostics).then(()=>setMessage('loginStatus','Diagnóstico copiado. Não compartilhe senhas nem tokens.')).catch(()=>{});
+      };
+    }
   }
 
 
@@ -268,6 +288,9 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     exit();
     const retry=field('retryAuthButton');
     if(retry)retry.hidden=true;
+    const changeAccount=field('switchGoogleAccount');if(changeAccount)changeAccount.hidden=true;
+    const copyDiagnostics=field('copyAuthDiagnostics');if(copyDiagnostics)copyDiagnostics.hidden=true;
+    showAuthDiagnostics(user,undefined);
     if(!user){
       setMessage('loginStatus','Entre com a conta Google autorizada ou com e-mail e senha.');
       return;
@@ -276,8 +299,9 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     try{
       const profile=await readProfile(user);
       if(serial!==authCheckSerial)return;
+      showAuthDiagnostics(user,profile);
       if(!profile||profile.active!==true){
-        showRetry('A conta está autenticada, mas não tem um perfil ativo no Firestore. Confirme o UID em users/ e tente novamente.');
+        showRetry('O perfil deste UID não está ativo. Compare o UID exibido abaixo com o ID do documento na coleção users. Se forem diferentes, clique em Trocar conta Google.');
         return;
       }
       await showAuthorized(user,profile);
@@ -285,8 +309,8 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       setMessage('loginStatus','');
     }catch(e){
       if(serial!==authCheckSerial)return;
-      // Keep the Firebase session alive; a transient Firestore failure should
-      // not force a new Google popup.
+      // Keep the session available for diagnosis; never grant access without a valid profile.
+      showAuthDiagnostics(user,undefined);
       showRetry('Não foi possível concluir o acesso: '+humanError(e));
     }
   }
@@ -294,6 +318,13 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
   field('retryAuthButton').addEventListener('click',()=>{
     if(auth.currentUser)verifyAuthorization(auth.currentUser);
     else setMessage('loginStatus','Selecione Entrar com Google para autenticar novamente.');
+  });
+  field('switchGoogleAccount').addEventListener('click',async()=>{
+    try{
+      authCheckSerial++;
+      await signOut(auth);
+      await loginGoogle();
+    }catch(e){showRetry('Falha ao trocar conta: '+humanError(e))}
   });
   field('loginForm').addEventListener('submit',login);
   field('googleLoginButton').addEventListener('click',loginGoogle);
