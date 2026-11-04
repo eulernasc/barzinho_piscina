@@ -1,0 +1,36 @@
+name: Validar alteracoes Barzinho
+on:
+  push:
+    branches:
+      - feat/firebase-usuarios-salvamento-20261104
+  workflow_dispatch:
+jobs:
+  syntax-and-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar sintaxe dos scripts
+        run: |
+          set -e
+          for file in js/*.js; do
+            cp "$file" /tmp/check.mjs
+            node --check /tmp/check.mjs
+          done
+      - name: Verificar referencias e IDs da interface
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html=Path('index.html').read_text()
+          cloud=Path('js/cloud.js').read_text()
+          app=Path('js/app.js').read_text()
+          for item in ['appShell','loginScreen','loginForm','newUserForm','usersNav','usersTable','syncState','logoutButton','importLocalButton']:
+              assert f'id="{item}"' in html, f'ID faltante: {item}'
+          assert "startCloud" in app and "await saveDb()" in app
+          assert "runTransaction" in cloud
+          for path in ['js/app.js','js/operations.js','js/cloud.js','js/firebase-config.js','cloud.css','firestore.rules']:
+              assert Path(path).exists(), path
+          print('Validacao estatica concluida.')
+          PY
