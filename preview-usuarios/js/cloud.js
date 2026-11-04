@@ -61,18 +61,93 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     if(button)button.hidden=false;
   }
 
-  async function readCloud() {
-    const [meta,...snapshots]=await timeoutAfter(Promise.all([
-      getDocFromServer(metaRef),
-      ...entities.map(k=>getDocsFromServer(collection(firestore,'barzinho','principal',k)))
-    ]),'Carregamento dos dados',18000);
-    const next=emptyDb();
-    entities.forEach((key,index)=>{next[key]=snapshots[index].docs.map(d=>d.data().value).filter(Boolean)});
-    revision=meta.exists()?Number(meta.data().revision||0):0;
-    next.orderCounter=meta.exists()?Number(meta.data().orderCounter||1000):1000;
-    saved=clone(next);
-    setDb(next);
-    renderAll();
+
+  // REST uses the signed-in user's Firebase ID token and the SAME Firestore Rules.
+  // It avoids the hanging streaming channel observed in some browsers.
+  const restBase='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(firebaseConfig.projectId)+'/databases/(default)/documents';
+  function firestoreValue(v){
+    if(!v)return null;
+    if('nullValue' in v)return null;
+    if('booleanValue' in v)return v.booleanValue;
+    if('integerValue' in v)return Number(v.integerValue);
+    if('doubleValue' in v)return Number(v.doubleValue);
+    if('stringValue' in v)return v.stringValue;
+    if('timestampValue' in v)return v.timestampValue;
+    if('arrayValue' in v)return (v.arrayValue.values||[]).map(firestoreValue);
+    if('mapValue' in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,val])=>[k,firestoreValue(val)]));
+    return null;
+  }
+  function firestoreFields(record){
+    return Object.fromEntries(Object.entries(record?.fields||{}).map(([key,value])=>[key,firestoreValue(value)]));
+  }
+  async function restGet(path,{allow404=false,ms=12000}={}){
+    const user=auth.currentUser;
+    if(!user)throw Error('Sua sessão expirou. Entre novamente.');
+    const token=await timeoutAfter(user.getIdToken(),'Autenticação Firebase',ms);
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),ms);
+    try{
+      const response=await fetch(restBase+'/'+path,{
+        method:'GET',
+        headers:{Authorization:'Bearer '+token},
+        signal:controller.signal,
+        cache:'no-store'
+      });
+      if(allow404&&response.status===404)return null;
+      if(!response.ok){
+        let body={};try{body=await response.json()}catch{}
+        const reason=body.error?.message||response.statusText||'Erro inesperado';
+        const status=response.status;
+        if(status===403)throw Error('Firestore negou a leitura (403). Verifique regras e o UID cadastrado em users/.');
+        if(status===401)throw Error('Sessão inválida (401). Entre novamente.');
+        if(status===404)throw Error('Documento não encontrado (404).');
+        throw Error('Firestore HTTP '+status+': '+reason);
+      }
+      return await response.json();
+    }catch(e){
+      if(e.name==='AbortError')throw Error('O endereço firestore.googleapis.com não respondeu. Verifique bloqueio de rede, VPN ou proteção do navegador.');
+      if(e.name==='TypeError')throw Error('Falha de rede ou bloqueio da API firestore.googleapis.com neste navegador.');
+      throw e;
+    }finally{clearTimeout(timer);}
+  }
+  async function restList(key){
+    const all=[];let pageToken='';
+    do{
+      const suffix='barzinho/principal/'+key+'?pageSize=300'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+      const result=await restGet(suffix,{allow404:true});
+      if(result?.documents)all.push(...result.documents);
+      pageToken=result?.nextPageToken||'';
+      if(all.length>12000)throw Error('Volume de dados acima do limite de leitura. Contate o administrador.');
+    }while(pageToken);
+    return all;
+  }
+  async function readProfile(user){
+    const record=await restGet('users/'+encodeURIComponent(user.uid),{allow404:true,ms:12000});
+    return record?firestoreFields(record):null;
+  }
+  let reloadPromise=null;
+  async function readCloud(){
+    if(reloadPromise)return reloadPromise;
+    reloadPromise=(async()=>{
+      setMessage('syncState','Atualizando dados do bar...');
+      const [meta,...snapshots]=await Promise.all([
+        restGet('barzinho/principal',{allow404:true}),
+        ...entities.map(key=>restList(key))
+      ]);
+      const next=emptyDb();
+      entities.forEach((key,index)=>{
+        const docs=snapshots[index]||[];
+        next[key]=docs.map(d=>firestoreFields(d).value).filter(Boolean);
+      });
+      const metadata=meta?firestoreFields(meta):{};
+      revision=Number(metadata.revision||0);
+      next.orderCounter=Number(metadata.orderCounter||1000);
+      saved=clone(next);
+      setDb(next);
+      renderAll();
+      setMessage('syncState','Dados recebidos do Firestore.');
+    })();
+    try{return await reloadPromise}finally{reloadPromise=null}
   }
 
   // Detect changes by ID and avoid rewriting all sales on every new order.
@@ -158,14 +233,25 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     field('importLocalButton').hidden=record.role!=='admin';
     setMessage('syncState','Dados sincronizados com Firestore.');
     authorized(current);
-    unlistenMeta=onSnapshot(metaRef,snap=>{
-      if(!ready||saving)return;
-      const remote=Number(snap.data()?.revision||0);
-      if(remote!==revision) readCloud().catch(e=>setMessage('syncState','Falha na atualização: '+humanError(e)));
-    },e=>setMessage('syncState','Conexão de dados: '+humanError(e)));
-    unlistenRole=onSnapshot(doc(firestore,'users',user.uid),snap=>{
-      if(!snap.exists()||snap.data().active!==true) signOut(auth);
-    },()=>signOut(auth));
+    // Poll via authenticated REST because the SDK streaming channel is the
+    // reason the browser can hang; all operations still obey Firestore Rules.
+    let checking=false;
+    async function checkUpdates(){
+      if(!ready||saving||checking||!auth.currentUser)return;
+      checking=true;
+      try{
+        const profile=await readProfile(user);
+        if(!profile||profile.active!==true){await signOut(auth);return}
+        const meta=await restGet('barzinho/principal',{allow404:true});
+        const currentRevision=meta?Number(firestoreFields(meta).revision||0):0;
+        if(currentRevision!==revision)await readCloud();
+      }catch(e){
+        setMessage('syncState','Falha na sincronização: '+humanError(e));
+      }finally{checking=false}
+    }
+    const timer=setInterval(checkUpdates,12000);
+    unlistenMeta=()=>clearInterval(timer);
+    unlistenRole=()=>{};
   }
 
   function exit(){
@@ -188,16 +274,13 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     }
     setMessage('loginStatus','Verificando seu perfil de acesso no Firestore...');
     try{
-      const record=await timeoutAfter(
-        getDocFromServer(doc(firestore,'users',user.uid)),
-        'Verificação do seu cadastro',15000
-      );
+      const profile=await readProfile(user);
       if(serial!==authCheckSerial)return;
-      if(!record.exists()||record.data().active!==true){
+      if(!profile||profile.active!==true){
         showRetry('A conta está autenticada, mas não tem um perfil ativo no Firestore. Confirme o UID em users/ e tente novamente.');
         return;
       }
-      await showAuthorized(user,record.data());
+      await showAuthorized(user,profile);
       if(serial!==authCheckSerial)return;
       setMessage('loginStatus','');
     }catch(e){
