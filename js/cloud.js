@@ -179,13 +179,39 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     throw Error('Não foi encontrado o documento do seu UID nos bancos default e (default). Detalhes: '+errors.join(' | '));
   }
   // Diagnóstico SOMENTE leitura: nunca cria documentos, altera regras, nem mostra tokens.
+  // Comparar listDocuments com runQuery usando o mesmo token, sem gravar.
+  async function diagnoseQuery(collectionPath){
+    const slash=collectionPath.lastIndexOf('/');
+    const parent=slash<0?'':collectionPath.slice(0,slash);
+    const col=slash<0?collectionPath:collectionPath.slice(slash+1);
+    const token=await timeoutAfter(auth.currentUser.getIdToken(),'Token Firebase',9000);
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),9000);
+    try{
+      const endpoint=projectRoot+encodeURIComponent(databaseId)
+        +'/documents'+(parent?'/'+parent:'')+':runQuery';
+      const response=await fetch(endpoint,{
+        method:'POST',
+        headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({structuredQuery:{from:[{collectionId:col}],limit:1}}),
+        signal:controller.signal,cache:'no-store'
+      });
+      if(!response.ok){
+        const payload=await response.json().catch(()=>({}));
+        return response.status+' — '+(payload.error?.message||'acesso negado');
+      }
+      return 'OK (200)';
+    }catch(e){
+      return e.name==='AbortError'?'tempo esgotado':String(e.message||e);
+    }finally{clearTimeout(timer)}
+  }
   async function diagnosePermissions(user,profile,serial){
     if(!user||!profile||!databaseId)return;
     const results=[
       ['Perfil por UID (GET)', 'users/'+encodeURIComponent(user.uid)],
       ['Listagem de usuários (LIST)', 'users?pageSize=1'],
       ['Documento principal (GET)', 'barzinho/principal'],
-      ['Produto inexistente (GET)', 'barzinho/principal/products/__verificacao_sem_escrita__'],
+      ['Produto inexistente (GET)', 'barzinho/principal/products/validacao_doc_inexistente_20261104'],
       ['Produtos (LIST)', 'barzinho/principal/products?pageSize=1'],
       ['Vendas (LIST)', 'barzinho/principal/sales?pageSize=1'],
       ['Comandas (LIST)', 'barzinho/principal/orders?pageSize=1']
@@ -199,6 +225,12 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
         return name+': '+status+' — '+(status==404?'documento ou recurso ausente':status==403?'acesso negado':String(e.message).slice(0,110));
       }
     }));
+    const queryResults=await Promise.all([
+      diagnoseQuery('users'),
+      diagnoseQuery('barzinho/principal/products')
+    ]);
+    readings.push('Usuários (runQuery): '+queryResults[0]);
+    readings.push('Produtos (runQuery): '+queryResults[1]);
     if(serial!==authCheckSerial)return;
     const box=field('authDiagnostics');
     if(box){
