@@ -84,7 +84,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     if(copy){
       copy.hidden=false;
       copy.onclick=()=>{
-        navigator.clipboard?.writeText(diagnostics).then(()=>setMessage('loginStatus','Diagnóstico copiado. Não compartilhe senhas nem tokens.')).catch(()=>{});
+        navigator.clipboard?.writeText(wrap.textContent).then(()=>setMessage('loginStatus','Diagnóstico copiado. Não compartilhe senhas nem tokens.')).catch(()=>{});
       };
     }
   }
@@ -178,6 +178,49 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     }
     throw Error('Não foi encontrado o documento do seu UID nos bancos default e (default). Detalhes: '+errors.join(' | '));
   }
+  // Diagnóstico SOMENTE leitura: nunca cria documentos, altera regras, nem mostra tokens.
+  async function diagnosePermissions(user,profile,serial){
+    if(!user||!profile||!databaseId)return;
+    const results=[
+      ['Perfil por UID (GET)', 'users/'+encodeURIComponent(user.uid)],
+      ['Listagem de usuários (LIST)', 'users?pageSize=1'],
+      ['Documento principal (GET)', 'barzinho/principal'],
+      ['Produto inexistente (GET)', 'barzinho/principal/products/__verificacao_sem_escrita__'],
+      ['Produtos (LIST)', 'barzinho/principal/products?pageSize=1'],
+      ['Vendas (LIST)', 'barzinho/principal/sales?pageSize=1'],
+      ['Comandas (LIST)', 'barzinho/principal/orders?pageSize=1']
+    ];
+    const readings=await Promise.all(results.map(async ([name,path])=>{
+      try{
+        await restGet(path,{ms:9000});
+        return name+': OK (200)';
+      }catch(e){
+        const status=e.httpStatus||(e.message?.match(/(?:HTTP |Firestore )(40[134]|50[0-9])/i)?.[1])||'?';
+        return name+': '+status+' — '+(status==404?'documento ou recurso ausente':status==403?'acesso negado':String(e.message).slice(0,110));
+      }
+    }));
+    if(serial!==authCheckSerial)return;
+    const box=field('authDiagnostics');
+    if(box){
+      box.hidden=false;
+      box.textContent+='\n\nTESTE DE PERMISSÕES (somente leitura):\n'
+        +'Perfil informado: active='+String(profile.active)+', role='+String(profile.role)+'\n'
+        +readings.join('\n');
+    }
+    const adminList=readings[1],itemGet=readings[3],itemList=readings[4];
+    if(adminList.includes('403')){
+      setMessage('loginStatus','Diagnóstico: até a listagem de usuários (admin) foi negada. As regras publicadas não estão reconhecendo a permissão de administrador. Veja os testes abaixo.');
+    }else if(itemList.includes('403') && (itemGet.includes('404')||itemGet.includes('200'))){
+      setMessage('loginStatus','Diagnóstico: a leitura individual do produto foi permitida, mas a LISTAGEM foi negada. Precisamos conferir a operação list nas regras publicadas deste banco.');
+    }else if(itemList.includes('403')){
+      setMessage('loginStatus','Diagnóstico: tanto a leitura quanto a listagem de produtos estão bloqueadas. Verifique a cobertura das regras no caminho barzinho/principal/products/{itemId}.');
+    }else if(readings.some(line=>line.includes('403'))){
+      setMessage('loginStatus','Diagnóstico: uma ou mais coleções foram negadas. Veja quais caminhos falharam abaixo.');
+    }else{
+      setMessage('loginStatus','Diagnóstico de permissões concluído. Veja os resultados por operação abaixo.');
+    }
+  }
+
   let reloadPromise=null;
   async function readCloud(){
     if(reloadPromise)return reloadPromise;
@@ -329,8 +372,10 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       return;
     }
     setMessage('loginStatus','Verificando seu perfil de acesso no Firestore...');
+    let verifiedProfile=null;
     try{
       const profile=await readProfile(user);
+      verifiedProfile=profile;
       if(serial!==authCheckSerial)return;
       showAuthDiagnostics(user,profile);
       if(!profile||profile.active!==true){
@@ -343,8 +388,12 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     }catch(e){
       if(serial!==authCheckSerial)return;
       // Keep the session available for diagnosis; never grant access without a valid profile.
-      showAuthDiagnostics(user,undefined);
-      showRetry('Não foi possível concluir o acesso: '+humanError(e));
+      showAuthDiagnostics(user,verifiedProfile);
+      showRetry('Não foi possível concluir o acesso: '+humanError(e)+' Analisando permissões de leitura...');
+      if(verifiedProfile && databaseId) {
+        try { await diagnosePermissions(user,verifiedProfile,serial); }
+        catch(diagError){if(serial===authCheckSerial)setMessage('loginStatus','Diagnóstico não concluiu: '+humanError(diagError));}
+      }
     }
   }
   onAuthStateChanged(auth,user=>verifyAuthorization(user));
