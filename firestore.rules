@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function loggedIn() { return request.auth != null; }
+    function userRef() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function authorized() {
+      return loggedIn() && exists(userRef()) && get(userRef()).data.active == true;
+    }
+    function administrator() {
+      return authorized() && get(userRef()).data.role == 'admin';
+    }
+
+    // An account created directly via Firebase Auth has NO application access
+    // until the administrator explicitly creates its active user document.
+    match /users/{uid} {
+      allow get: if loggedIn() && (request.auth.uid == uid || administrator());
+      allow list: if administrator();
+      allow create: if administrator()
+        && request.resource.data.keys().hasOnly(['name','email','role','active','createdAt','createdBy'])
+        && request.resource.data.role == 'staff'
+        && request.resource.data.active == true
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if administrator()
+        && resource.data.role == 'staff'
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','updatedAt']);
+      allow delete: if false;
+    }
+
+    match /barzinho/principal {
+      allow read: if authorized();
+      allow create: if authorized()
+        && request.resource.data.keys().hasOnly(['revision','orderCounter','updatedAt'])
+        && request.resource.data.revision == 1;
+      allow update: if authorized()
+        && request.resource.data.keys().hasOnly(['revision','orderCounter','updatedAt'])
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+
+    match /barzinho/principal/{entity}/{itemId} {
+      allow read, write: if authorized()
+        && entity in ['products','sales','orders','movements','purchases','stockAdjustments'];
+    }
+
+    // Everything else is denied by default, unless separately allowed by
+    // another rule that shares the same Firebase database.
+  }
+}

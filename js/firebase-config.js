@@ -1,12 +1,10 @@
-// Etapa futura: substituir o armazenamento local pelo Firebase/Firestore.
-// Quando o projeto Firebase for criado, inserir aqui a configuração pública do app web.
-// NÃO colocar Service Account ou chaves privadas no frontend.
-//
-// export const firebaseConfig = {
-//   apiKey: "...",
-//   authDomain: "...",
-//   projectId: "...",
-//   storageBucket: "...",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
+// Configuracao publica do aplicativo Web - Firebase Project: barzinhodapiscina
+// Nao coloque senhas, tokens privados ou service accounts neste arquivo.
+export const firebaseConfig = {
+  apiKey: "AIzaSyBvyL1z9Dy-MvNiXqjm18VWaWBY3NPEpDY",
+  authDomain: "barzinhodapiscina.firebaseapp.com",
+  projectId: "barzinhodapiscina",
+  storageBucket: "barzinhodapiscina.firebasestorage.app",
+  messagingSenderId: "167562296250",
+  appId: "1:167562296250:web:b1089515f02962ed347b83"
+};
