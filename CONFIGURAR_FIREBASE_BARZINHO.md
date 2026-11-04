@@ -19,14 +19,14 @@ Esta branch contém login, gerenciamento de usuários e sincronização com Fire
 3. Em Authentication, confirme E-mail/senha habilitado e configure eulernasc.github.io como domínio autorizado. Para testes locais, autorize localhost se necessário.
 4. Confirme que o Cloud Firestore está criado.
 5. Revise e publique o conteúdo de firestore.rules no Firebase correto. Se já houver outras regras, integre os blocos deste app preservando as regras dos outros sistemas.
-6. No Firebase Authentication, identifique o UID da sua conta administradora. Crie uma única vez o documento Firestore users/{SEU_UID} com:
+6. CONTA ADMINISTRADORA: o Authentication mostra a conta atual com provedor Google. A tela do app agora oferece Entrar com Google, então **não é necessário criar outra conta com e-mail e senha**. No Firebase Authentication, identifique o UID dessa conta. Crie uma única vez o documento Firestore users/{SEU_UID} com:
    name: seu nome
    email: e-mail cadastrado
    role: admin
    active: true
 
 O app não promove usuários automaticamente. Esse cadastro inicial deve ser seguro e manual.
-7. Entre como administrador. A partir daí, novos logins poderão ser criados pelo app.
+7. Entre com o botão Entrar com Google usando a conta desse UID. A partir daí, novos logins de funcionários poderão ser criados pelo app com e-mail e senha.
 
 ## Migração de dados antigos
 - Guarde backup do localStorage identificado por barzinhoPiscinaDB_v1.
