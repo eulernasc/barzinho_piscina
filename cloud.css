@@ -43,3 +43,7 @@
 .google-login:hover {background:#eaf2ff;}
 .google-login:disabled {cursor:wait;opacity:.65;}
 .google-login:before {content:'G';font-size:21px;line-height:1;font-weight:800;color:#4285f4;}
+
+.auth-diagnostics{white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(255,255,255,.08);color:#e5f1ff;font-size:12px;line-height:1.65;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.18);margin:12px 0}
+.login-diag-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.login-diag-actions button{flex:1;min-width:145px}
