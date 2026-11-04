@@ -1,9 +1,10 @@
-import {initOperations,renderOperations} from './operations.js?v=20261029-itens3';
+import {initOperations,renderOperations} from './operations.js?v=20261104-auth1';
+import {startCloud} from './cloud.js?v=20261104-auth1';
 const DB_KEY='barzinhoPiscinaDB_v1';
 const emptyDb=()=>({products:[],sales:[],movements:[],purchases:[],stockAdjustments:[],orders:[],orderCounter:1000});
-let db=loadDb();let cart=[];let purchaseDraft=[];
+let db=emptyDb();let cart=[];let purchaseDraft=[];let cloudController=null;let operationsReady=false;let saleSaving=false;
 function loadDb(){try{const data=JSON.parse(localStorage.getItem(DB_KEY))||emptyDb();data.products||=[];data.sales||=[];data.movements||=[];data.purchases||=[];data.stockAdjustments||=[];data.orders||=[];data.orderCounter||=1000;return data}catch{return emptyDb()}}
-function saveDb(){localStorage.setItem(DB_KEY,JSON.stringify(db))}
+async function saveDb(){if(!cloudController)throw Error('Banco ainda não inicializado.');return cloudController.saveDb()}
 const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const uid=p=>`${p}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
 const el=id=>document.getElementById(id);
@@ -12,7 +13,7 @@ function toast(msg){el('toast').textContent=msg;el('toast').classList.add('show'
 function seed(){if(db.products.length&&!confirm('Já existem produtos. Deseja adicionar os exemplos mesmo assim?'))return;const ex=[['Cerveja Lata','Bebidas',7,4.1,60,10,true],['Refrigerante Lata','Bebidas',6,3.2,40,8,true],['Água Mineral','Bebidas',4,1.4,50,10,true],['Porção de Batata','Porções',28,12,20,5,true],['X-Burguer','Lanches',18,8.5,25,5,true],['Espetinho','Porções',10,4.2,30,6,true]];db.products.push(...ex.map(x=>({id:uid('p'),name:x[0],category:x[1],price:x[2],cost:x[3],stock:x[4],minStock:x[5],trackStock:x[6]})));saveDb();renderAll();toast('Produtos de exemplo adicionados.')}
 function closeMobileMenu(){const sidebar=document.querySelector('.sidebar'),toggle=el('menuToggle');sidebar?.classList.remove('mobile-open');document.body.classList.remove('menu-open');toggle?.setAttribute('aria-expanded','false');toggle?.setAttribute('aria-label','Abrir menu')}
 function toggleMobileMenu(){const sidebar=document.querySelector('.sidebar'),toggle=el('menuToggle');if(!sidebar||!toggle)return;const open=!sidebar.classList.contains('mobile-open');sidebar.classList.toggle('mobile-open',open);document.body.classList.toggle('menu-open',open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Fechar menu':'Abrir menu')}
-function setView(view){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));el(`view-${view}`).classList.add('active-view');const map={visao:['Visão geral','Seu bar organizado, do balcão à cozinha.'],comandas:['Comandas','Atendimento por cliente ou mesa, com pagamento no final.'],cozinha:['Cozinha','Pedidos lançados, em preparo e prontos para entrega.'],relatorios:['Relatórios','Acompanhe vendas e os produtos mais pedidos.'],pdv:['PDV','Venda rápida no balcão e emissão de fichas individuais.'],produtos:['Produtos','Cadastro de produtos, custos e preços.'],estoque:['Estoque','Ajuste quantidades e acompanhe valor parado.'],financeiro:['Financeiro','Vendas, compras de estoque, custos, entradas e saídas.'],historico:['Histórico','Consulte vendas, entregas e fichas emitidas.']};el('viewTitle').textContent=map[view][0];el('viewSubtitle').textContent=map[view][1];closeMobileMenu();renderAll()}
+function setView(view){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));el(`view-${view}`).classList.add('active-view');const map={visao:['Visão geral','Seu bar organizado, do balcão à cozinha.'],comandas:['Comandas','Atendimento por cliente ou mesa, com pagamento no final.'],cozinha:['Cozinha','Pedidos lançados, em preparo e prontos para entrega.'],relatorios:['Relatórios','Acompanhe vendas e os produtos mais pedidos.'],pdv:['PDV','Venda rápida no balcão e emissão de fichas individuais.'],produtos:['Produtos','Cadastro de produtos, custos e preços.'],estoque:['Estoque','Ajuste quantidades e acompanhe valor parado.'],financeiro:['Financeiro','Vendas, compras de estoque, custos, entradas e saídas.'],historico:['Histórico','Consulte vendas, entregas e fichas emitidas.'],usuarios:['Usuários','Cadastro, bloqueio e gestão de acessos.']};if(view==='usuarios'&&cloudController?.loginUser()?.role!=='admin')return;el('viewTitle').textContent=map[view][0];el('viewSubtitle').textContent=map[view][1];closeMobileMenu();renderAll();if(view==='usuarios')cloudController?.renderUsers()}
 function renderCategories(){const cats=[...new Set(db.products.map(p=>p.category))].sort();const cur=el('categoryFilter').value;el('categoryFilter').innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');el('categoryFilter').value=cur}
 function renderProductsForSale(){const term=el('searchProduct').value.toLowerCase(),cat=el('categoryFilter').value;const products=db.products.filter(p=>(!term||p.name.toLowerCase().includes(term))&&(!cat||p.category===cat));el('productGrid').innerHTML=products.length?products.map(p=>`<article class="product-card"><span class="category">${esc(p.category)}</span><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}</div><div class="stock">${p.trackStock?`Estoque: ${p.stock}`:'Sem controle de estoque'}</div><div class="product-actions"><button class="secondary small" data-add-now="${p.id}" ${p.trackStock&&p.stock<=0?'disabled':''}>Entregar agora</button><button class="primary small" data-add-token="${p.id}" ${p.trackStock&&p.stock<=0?'disabled':''}>+ Ficha</button></div></article>`).join(''):`<div class="empty"><strong>${db.products.length?'Nenhum item combina com a busca.':'Seu balcão está pronto.'}</strong><br><span>${db.products.length?'Tente outro nome ou categoria.':'Cadastre os produtos ou use “Carregar exemplo” para ver o PDV funcionando.'}</span></div>`}
 function getCartRow(id){return cart.find(x=>x.productId===id)}
@@ -32,7 +33,40 @@ function renderCart(){
   const shortcut=el('mobileCartShortcut');if(shortcut){shortcut.classList.toggle('visible',qty>0);el('mobileCartQty').textContent=qty;el('mobileCartTotal').textContent=money(total)}
 }
 function normalizedSaleItem(i){return{...i,immediateQty:i.immediateQty??i.qty??0,tokenQty:i.tokenQty??0,qty:(i.immediateQty??i.qty??0)+(i.tokenQty??0)}}
-function finishSale(){if(!cart.length){toast('Adicione pelo menos um item.');return}const items=cart.map(i=>{const p=db.products.find(x=>x.id===i.productId);return{productId:p.id,name:p.name,immediateQty:i.immediateQty||0,tokenQty:i.tokenQty||0,qty:totalQty(i),unitPrice:p.price,unitCost:p.cost}});for(const i of items){const p=db.products.find(x=>x.id===i.productId);if(p.trackStock&&p.stock<i.qty){toast(`Estoque insuficiente para ${p.name}.`);return}}const sale={id:uid('v'),number:String(Date.now()).slice(-6),createdAt:new Date().toISOString(),payment:el('paymentMethod').value,items,total:items.reduce((s,i)=>s+i.unitPrice*i.qty,0),cost:items.reduce((s,i)=>s+i.unitCost*i.qty,0),tokenCount:items.reduce((s,i)=>s+i.tokenQty,0),immediateCount:items.reduce((s,i)=>s+i.immediateQty,0)};items.forEach(i=>{const p=db.products.find(x=>x.id===i.productId);if(p.trackStock)p.stock-=i.qty});db.sales.unshift(sale);saveDb();printSale(sale);cart=[];setPdvPayment('Dinheiro');renderAll();toast('Venda concluída.')}
+async function finishSale(){
+  if(saleSaving)return;
+  if(!cart.length){toast('Adicione pelo menos um item.');return}
+  const items=cart.map(i=>{
+    const p=db.products.find(x=>x.id===i.productId);
+    return {productId:p.id,name:p.name,immediateQty:i.immediateQty||0,tokenQty:i.tokenQty||0,
+      qty:totalQty(i),unitPrice:p.price,unitCost:p.cost}
+  });
+  for(const i of items){
+    const p=db.products.find(x=>x.id===i.productId);
+    if(p.trackStock&&p.stock<i.qty){toast('Estoque insuficiente para '+p.name+'.');return}
+  }
+  const sale={id:uid('v'),number:String(Date.now()).slice(-6),createdAt:new Date().toISOString(),
+    payment:el('paymentMethod').value,items,
+    total:items.reduce((n,i)=>n+i.unitPrice*i.qty,0),
+    cost:items.reduce((n,i)=>n+i.unitCost*i.qty,0),
+    tokenCount:items.reduce((n,i)=>n+i.tokenQty,0),
+    immediateCount:items.reduce((n,i)=>n+i.immediateQty,0)};
+  saleSaving=true;
+  el('finishSale').disabled=true;
+  toast('Salvando venda no Firebase...');
+  items.forEach(i=>{const p=db.products.find(x=>x.id===i.productId);if(p.trackStock)p.stock-=i.qty});
+  db.sales.unshift(sale);
+  try{
+    await saveDb();
+    // Print and clear the cart ONLY AFTER the Firestore transaction succeeded.
+    cart=[];setPdvPayment('Dinheiro');renderAll();
+    toast('Venda confirmada e registrada no Firebase.');
+    printSale(sale);
+  }catch(e){
+    renderAll();
+    toast('Venda NÃO concluída: '+(e.message||'erro ao salvar')+'. Verifique os dados.');
+  }finally{saleSaving=false;el('finishSale').disabled=false;}
+}
 function printSale(sale){const tokenBlocks=sale.items.flatMap(item=>Array.from({length:item.tokenQty||0},(_,idx)=>`<section class="token-slip"><div class="tear">✂ DESTACAR AQUI</div><div class="token-brand">BARZINHO DA PISCINA</div><div class="token-order">Pedido #${sale.number}</div><div class="token-name">${esc(item.name)}</div><div class="token-seq">FICHA ${idx+1} DE ${item.tokenQty}</div><div class="token-valid">Entregue esta ficha no balcão para retirar 1 unidade.</div></section>`)).join('');el('printArea').innerHTML=`<div class="ticket"><section class="sale-receipt"><h2>BARZINHO DA PISCINA</h2><p>Praça de Esportes</p><p>Pedido #${sale.number}</p><div class="line"></div><p>${new Date(sale.createdAt).toLocaleString('pt-BR')}</p>${sale.items.map(i=>`<div class="item"><span>${i.qty}x ${esc(i.name)}</span><strong>${money(i.unitPrice*i.qty)}</strong></div>${i.immediateQty?`<div class="item sub"><span>↳ retirar agora</span><span>${i.immediateQty}</span></div>`:''}${i.tokenQty?`<div class="item sub"><span>↳ em fichas</span><span>${i.tokenQty}</span></div>`:''}`).join('')}<div class="line"></div><div class="item"><strong>TOTAL</strong><strong>${money(sale.total)}</strong></div><p>${sale.payment}</p></section>${tokenBlocks}</div>`;window.print()}
 function renderProductTable(){el('productsTableWrap').innerHTML=db.products.length?`<table><thead><tr><th>Produto</th><th>Categoria</th><th>Venda</th><th>Custo</th><th>Estoque</th><th>Margem</th><th></th></tr></thead><tbody>${db.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${money(p.price)}</td><td>${money(p.cost)}</td><td>${p.trackStock?p.stock:'—'}</td><td>${p.price>0?(((p.price-p.cost)/p.price)*100).toFixed(1)+'%':'0%'}</td><td><button class="link-btn" data-edit="${p.id}">Editar</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum produto cadastrado.</div>'}
 function renderStock(){el('stockItems').textContent=db.products.length;el('stockCost').textContent=money(db.products.reduce((s,p)=>s+(p.trackStock?p.stock*p.cost:0),0));el('stockRevenue').textContent=money(db.products.reduce((s,p)=>s+(p.trackStock?p.stock*p.price:0),0));el('lowStock').textContent=db.products.filter(p=>p.trackStock&&p.stock<=p.minStock).length;el('stockTableWrap').innerHTML=db.products.length?`<table><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th><th>Situação</th><th>Custo unit.</th><th>Valor em estoque</th><th>Ações</th></tr></thead><tbody>${db.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.trackStock?p.stock:'—'}</td><td>${p.trackStock?p.minStock:'—'}</td><td>${p.trackStock?(p.stock<=p.minStock?'<span class="badge low">Baixo</span>':'<span class="badge">OK</span>'):'Sem controle'}</td><td>${money(p.cost)}</td><td>${money(p.trackStock?p.stock*p.cost:0)}</td><td class="actions-cell"><button class="link-btn" data-stock="${p.id}" ${!p.trackStock?'disabled':''}>Ajustar estoque</button><button class="link-btn" data-edit="${p.id}">Editar produto</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nenhum produto cadastrado.</div>'}
@@ -83,9 +117,21 @@ el('searchProduct').addEventListener('input',renderProductsForSale);el('category
 el('clearCart').addEventListener('click',()=>{cart=[];renderCart()});el('finishSale').addEventListener('click',finishSale);
 el('mobileCartShortcut')?.addEventListener('click',()=>el('cartPanel')?.scrollIntoView({behavior:'smooth',block:'start'}));
 el('newProductBtn').addEventListener('click',()=>openProduct());el('productForm').addEventListener('submit',saveProduct);el('stockForm').addEventListener('submit',saveStockAdjustment);el('newPurchaseBtn').addEventListener('click',openPurchase);el('addPurchaseItem').addEventListener('click',addPurchaseDraftItem);el('purchaseForm').addEventListener('submit',savePurchase);el('addMovement').addEventListener('click',addMovement);el('seedBtn').addEventListener('click',seed);
-initOperations({getDb:()=>db,saveDb,renderAll,toast,money,uid,el,setView});
+function onCloudAuthorized(){
+  if(!operationsReady){
+    initOperations({getDb:()=>db,saveDb,renderAll,toast,money,uid,el,setView});
+    operationsReady=true;
+  }
+  renderAll();
+}
+cloudController=startCloud({
+  getDb:()=>db,setDb:next=>{db=next},renderAll,
+  authorized:onCloudAuthorized,
+  revoked:()=>{cart=[];purchaseDraft=[]},
+  toast
+});
 function syncFinanceRange(changed){const from=el('financeFrom'),to=el('financeTo');if(changed==='from'&&from.value&&to.value&&from.value>to.value)to.value=from.value;if(changed==='to'&&from.value&&to.value&&to.value<from.value)from.value=to.value;to.min=from.value||'';from.max=to.value||'';renderFinancial()}
 el('financeFrom').addEventListener('change',()=>syncFinanceRange('from'));el('financeTo').addEventListener('change',()=>syncFinanceRange('to'));el('financeReset').addEventListener('click',()=>{el('financeFrom').value='';el('financeTo').value='';el('financeFrom').max='';el('financeTo').min='';renderFinancial()});
-const updateClock=()=>el('clock').textContent=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});updateClock();setInterval(updateClock,1000);setPdvPayment('Dinheiro');renderAll();
+const updateClock=()=>el('clock').textContent=new Date().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});updateClock();setInterval(updateClock,1000);setPdvPayment('Dinheiro');
 
 
