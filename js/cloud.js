@@ -254,7 +254,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       return e.name==='AbortError'?'tempo esgotado':String(e.message||e);
     }finally{clearTimeout(timer)}
   }
-  async function diagnosePermissions(user,profile,serial){
+  async function diagnosePermissions(user,profile,serial,originalError){
     if(!user||!profile||!databaseId)return;
     const results=[
       ['Perfil por UID (GET)', 'users/'+encodeURIComponent(user.uid)],
@@ -288,17 +288,14 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
         +'Perfil informado: active='+String(profile.active)+', role='+String(profile.role)+'\n'
         +readings.join('\n');
     }
-    const adminList=readings[1],itemGet=readings[3],itemList=readings[4];
-    if(adminList.includes('403')){
-      setMessage('loginStatus','Diagnóstico: até a listagem de usuários (admin) foi negada. As regras publicadas não estão reconhecendo a permissão de administrador. Veja os testes abaixo.');
-    }else if(itemList.includes('403') && (itemGet.includes('404')||itemGet.includes('200'))){
-      setMessage('loginStatus','Diagnóstico: a leitura individual do produto foi permitida, mas a LISTAGEM foi negada. Precisamos conferir a operação list nas regras publicadas deste banco.');
-    }else if(itemList.includes('403')){
-      setMessage('loginStatus','Diagnóstico: tanto a leitura quanto a listagem de produtos estão bloqueadas. Verifique a cobertura das regras no caminho barzinho/principal/products/{itemId}.');
-    }else if(readings.some(line=>line.includes('403'))){
-      setMessage('loginStatus','Diagnóstico: uma ou mais coleções foram negadas. Veja quais caminhos falharam abaixo.');
+    // listDocuments may fail while runQuery succeeds; do NOT misdiagnose
+    // this as a missing admin role.
+    const runUsers=queryResults[0],runProducts=queryResults[1];
+    const reason=humanError(originalError||new Error('Falha desconhecida'));
+    if(runUsers==='OK (200)' && runProducts==='OK (200)'){
+      setMessage('loginStatus','As consultas runQuery de usuários e produtos estão permitidas. Falhou uma etapa específica: '+reason+'. Veja os testes abaixo.');
     }else{
-      setMessage('loginStatus','Diagnóstico de permissões concluído. Veja os resultados por operação abaixo.');
+      setMessage('loginStatus','Falha ao carregar: '+reason+'. Consulte os resultados runQuery detalhados abaixo.');
     }
   }
 
@@ -472,7 +469,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       showAuthDiagnostics(user,verifiedProfile);
       showRetry('Não foi possível concluir o acesso: '+humanError(e)+' Analisando permissões de leitura...');
       if(verifiedProfile && databaseId) {
-        try { await diagnosePermissions(user,verifiedProfile,serial); }
+        try { await diagnosePermissions(user,verifiedProfile,serial,e); }
         catch(diagError){if(serial===authCheckSerial)setMessage('loginStatus','Diagnóstico não concluiu: '+humanError(diagError));}
       }
     }
