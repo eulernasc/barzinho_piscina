@@ -39,9 +39,17 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     return {saveDb:async()=>{throw Error('Firebase ainda não configurado.')},isActive:()=>false};
   }
   const app=initializeApp(firebaseConfig),auth=getAuth(app);
-  // Long-polling avoids WebChannel connections that can stall behind some proxies.
-  const firestore=initializeFirestore(app,{experimentalForceLongPolling:true});
-  const metaRef=doc(firestore,'barzinho','principal');
+  // O Firestore pode ter um banco nomeado "default", diferente de "(default)".
+  // A escolha só ocorre após localizar o perfil pelo token Firebase do usuário.
+  let databaseId=null,firestore=null,metaRef=null;
+  function selectDatabase(id){
+    if(databaseId && databaseId!==id)throw Error('O banco já foi selecionado para esta sessão.');
+    if(!firestore) {
+      firestore=initializeFirestore(app,{experimentalForceLongPolling:true},id);
+      metaRef=doc(firestore,'barzinho','principal');
+    }
+    databaseId=id;
+  }
   let saved=emptyDb(),revision=0,current=null,saving=false,ready=false;
   let unlistenRole=()=>{},unlistenMeta=()=>{};
   let adminListBusy=false;
@@ -70,7 +78,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     const provider=user.providerData?.map(p=>p.providerId).join(', ')||'Firebase';
     const status=profile===undefined?'Aguardando verificação':!profile?'Documento users/ não encontrado':profile.active===true?'Ativo':'Documento encontrado, mas active não é true';
     const email=user.email||'(sem e-mail)';
-    const diagnostics=['Projeto: '+firebaseConfig.projectId,'E-mail autenticado: '+email,'UID autenticado: '+user.uid,'Provedor: '+provider,'Perfil Firestore: '+status].join('\n');
+    const diagnostics=['Projeto: '+firebaseConfig.projectId,'Banco Firestore: '+(databaseId||'verificando'), 'E-mail autenticado: '+email,'UID autenticado: '+user.uid,'Provedor: '+provider,'Perfil Firestore: '+status].join('\n');
     wrap.textContent=diagnostics;
     const copy=field('copyAuthDiagnostics');
     if(copy){
@@ -84,7 +92,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
 
   // REST uses the signed-in user's Firebase ID token and the SAME Firestore Rules.
   // It avoids the hanging streaming channel observed in some browsers.
-  const restBase='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(firebaseConfig.projectId)+'/databases/(default)/documents';
+  const projectRoot='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(firebaseConfig.projectId)+'/databases/';
   function firestoreValue(v){
     if(!v)return null;
     if('nullValue' in v)return null;
@@ -100,27 +108,34 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
   function firestoreFields(record){
     return Object.fromEntries(Object.entries(record?.fields||{}).map(([key,value])=>[key,firestoreValue(value)]));
   }
-  async function restGet(path,{allow404=false,ms=12000}={}){
+  async function restGet(path,{allow404=false,ms=12000,targetDb=null}={}){
     const user=auth.currentUser;
     if(!user)throw Error('Sua sessão expirou. Entre novamente.');
     const token=await timeoutAfter(user.getIdToken(),'Autenticação Firebase',ms);
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),ms);
     try{
-      const response=await fetch(restBase+'/'+path,{
+      const db=targetDb||databaseId;
+      if(!db)throw Error('Banco Firestore não selecionado.');
+      const base=projectRoot+encodeURIComponent(db)+'/documents/';
+      const response=await fetch(base+path,{
         method:'GET',
         headers:{Authorization:'Bearer '+token},
         signal:controller.signal,
         cache:'no-store'
       });
-      if(allow404&&response.status===404)return null;
       if(!response.ok){
         let body={};try{body=await response.json()}catch{}
         const reason=body.error?.message||response.statusText||'Erro inesperado';
         const status=response.status;
-        if(status===403)throw Error('Firestore negou a leitura (403). Verifique regras e o UID cadastrado em users/.');
+        if(status===404){
+          if(allow404 && !/database (was )?not found|requested database|database .* does not exist/i.test(reason))return null;
+          const error=new Error('Firestore 404 no banco '+db+': '+reason);
+          error.httpStatus=404;
+          throw error;
+        }
+        if(status===403)throw Error('Firestore negou a leitura (403) no banco '+db+': '+reason);
         if(status===401)throw Error('Sessão inválida (401). Entre novamente.');
-        if(status===404)throw Error('Documento não encontrado (404).');
         throw Error('Firestore HTTP '+status+': '+reason);
       }
       return await response.json();
@@ -142,8 +157,26 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     return all;
   }
   async function readProfile(user){
-    const record=await restGet('users/'+encodeURIComponent(user.uid),{allow404:true,ms:12000});
-    return record?firestoreFields(record):null;
+    if(databaseId){
+      const record=await restGet('users/'+encodeURIComponent(user.uid),{allow404:true,ms:12000});
+      return record?firestoreFields(record):null;
+    }
+    const errors=[];
+    // O console mostra "default". Primeiro buscamos neste banco nomeado;
+    // se não existir o documento, verificamos o banco padrão "(default)".
+    for(const id of ['default','(default)']){
+      try{
+        const record=await restGet('users/'+encodeURIComponent(user.uid),{ms:12000,targetDb:id});
+        if(record){
+          selectDatabase(id);
+          return firestoreFields(record);
+        }
+      }catch(e){
+        if(e.httpStatus===404){errors.push(id+': '+e.message);continue}
+        throw e;
+      }
+    }
+    throw Error('Não foi encontrado o documento do seu UID nos bancos default e (default). Detalhes: '+errors.join(' | '));
   }
   let reloadPromise=null;
   async function readCloud(){
