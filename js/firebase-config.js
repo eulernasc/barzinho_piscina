@@ -1,12 +1,11 @@
-// Etapa futura: substituir o armazenamento local pelo Firebase/Firestore.
-// Quando o projeto Firebase for criado, inserir aqui a configuração pública do app web.
-// NÃO colocar Service Account ou chaves privadas no frontend.
-//
-// export const firebaseConfig = {
-//   apiKey: "...",
-//   authDomain: "...",
-//   projectId: "...",
-//   storageBucket: "...",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
+// Configure APENAS os dados PUBLICOS do app Web em Firebase Console > Configuracoes do projeto.
+// Nunca insira senhas, service accounts ou chaves privadas neste arquivo.
+// Depois de preencher, publique firestore.rules e crie o documento admin inicial.
+export const firebaseConfig = {
+  apiKey: '',
+  authDomain: '',
+  projectId: '',
+  appId: '',
+  messagingSenderId: '',
+  storageBucket: ''
+};
