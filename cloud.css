@@ -1,0 +1,38 @@
+/* Área de autenticação e administração, integrada ao visual existente. */
+[hidden] { display:none !important; }
+.login-screen {
+  min-height:100dvh; display:grid; place-items:center; padding:24px;
+  background:radial-gradient(ellipse at top,#173e6b 0%,#071e39 54%,#07192d 100%);
+  color:#f8fbff;
+}
+.login-card {
+  width:min(100%,430px); border:1px solid rgba(255,255,255,.15);border-radius:24px;
+  background:rgba(12,38,65,.94);box-shadow:0 24px 70px rgba(0,0,0,.3);
+  padding:clamp(24px,6vw,38px);
+}
+.login-logo {width:76px;height:76px;object-fit:contain;display:block;margin:0 auto 18px;}
+.login-card h1 {margin:8px 0;font-size:clamp(25px,5vw,34px);color:#fff;}
+.login-card p {color:#c7dbeb;line-height:1.55;}
+.login-form {display:grid;gap:15px;margin-top:18px;}
+.login-form label {display:grid;gap:7px;font-weight:600;font-size:14px;}
+.login-form input {
+  width:100%;min-height:46px;border:1px solid #b4c9db;border-radius:12px;
+  background:#fff;color:#172a3b;padding:10px 14px;font:inherit;
+}
+.login-form button {min-height:46px;}
+#loginStatus,#usersStatus {font-size:14px;line-height:1.45;min-height:20px;}
+.session-name {font-size:12px;overflow-wrap:anywhere;opacity:.75;margin-left:auto;}
+.users-grid {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:18px;margin-top:18px;margin-bottom:18px;}
+.team-card {padding:clamp(18px,3vw,24px);}
+.team-card h3 {margin:0 0 16px;}
+.team-card p {line-height:1.55;}
+.team-user-row {display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid rgba(120,140,160,.23);}
+.team-user-row div {display:grid;gap:4px;min-width:0;}
+.team-user-row strong,.team-user-row small {overflow-wrap:anywhere;}
+.team-user-row small {font-size:12px;color:#667b91;}
+.team-user-row button {white-space:nowrap;}
+@media(max-width:780px) {
+  .users-grid {grid-template-columns:1fr;}
+  .team-user-row {flex-wrap:wrap;}
+  .session-name {display:none;}
+}
