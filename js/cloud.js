@@ -134,8 +134,8 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
           error.httpStatus=404;
           throw error;
         }
-        if(status===403)throw Error('Firestore negou a leitura (403) no banco '+db+': '+reason);
-        if(status===401)throw Error('Sessão inválida (401). Entre novamente.');
+        if(status===403){const err=Error('Firestore negou a leitura (403) no banco '+db+': '+reason);err.httpStatus=403;throw err;}
+        if(status===401){const err=Error('Sessão inválida (401). Entre novamente.');err.httpStatus=401;throw err;}
         throw Error('Firestore HTTP '+status+': '+reason);
       }
       return await response.json();
