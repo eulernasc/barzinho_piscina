@@ -145,16 +145,65 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       throw e;
     }finally{clearTimeout(timer);}
   }
+  // Queries use :runQuery because this database allows authenticated queries
+  // but returns 403 to the REST listDocuments endpoint, even for admin.
+  // Fetch every page in stable document-name order. Never return partial data.
+  async function queryCollection(collectionPath){
+    const slash=collectionPath.lastIndexOf('/');
+    const parent=slash>=0?collectionPath.slice(0,slash):'';
+    const collectionId=slash>=0?collectionPath.slice(slash+1):collectionPath;
+    if(!databaseId || !auth.currentUser)throw Error('Faça login para consultar os dados.');
+    const endpoint=projectRoot+encodeURIComponent(databaseId)
+      +'/documents'+(parent?'/'+parent:'')+':runQuery';
+    const pageSize=250,documents=[];
+    let lastName=null;
+    for(let page=0;page<60;page++){
+      const token=await timeoutAfter(auth.currentUser.getIdToken(),'Token Firebase',12000);
+      const structuredQuery={
+        from:[{collectionId}],
+        orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],
+        limit:pageSize
+      };
+      if(lastName)structuredQuery.startAt={
+        values:[{referenceValue:lastName}],before:false
+      };
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),18000);
+      let result;
+      try{
+        const response=await fetch(endpoint,{
+          method:'POST',
+          headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+          body:JSON.stringify({structuredQuery}),
+          cache:'no-store',signal:controller.signal
+        });
+        if(!response.ok){
+          const payload=await response.json().catch(()=>({}));
+          const reason=payload.error?.message||response.statusText;
+          const e=new Error('Falha ao consultar '+collectionPath+' (HTTP '+response.status+'): '+reason);
+          e.httpStatus=response.status;
+          throw e;
+        }
+        result=await response.json();
+        if(!Array.isArray(result))throw Error('Resposta inválida na consulta de '+collectionPath+'.');
+      }catch(e){
+        if(e.name==='AbortError')throw Error('Tempo esgotado ao consultar '+collectionPath+'.');
+        if(e.name==='TypeError')throw Error('Falha de rede ao consultar '+collectionPath+'.');
+        throw e;
+      }finally{clearTimeout(timer)}
+      const batch=result.map(r=>r.document).filter(Boolean);
+      if(batch.some(doc=>!doc.name))throw Error('Documento sem identificação em '+collectionPath+'.');
+      documents.push(...batch);
+      if(documents.length>12000)throw Error('Limite de registros atingido em '+collectionPath+'. Contate o administrador.');
+      if(batch.length<pageSize)return documents;
+      const nextLast=batch[batch.length-1].name;
+      if(nextLast===lastName)throw Error('Paginação repetida em '+collectionPath+'.');
+      lastName=nextLast;
+    }
+    throw Error('Limite de páginas atingido ao consultar '+collectionPath+'.');
+  }
   async function restList(key){
-    const all=[];let pageToken='';
-    do{
-      const suffix='barzinho/principal/'+key+'?pageSize=300'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
-      const result=await restGet(suffix,{allow404:true});
-      if(result?.documents)all.push(...result.documents);
-      pageToken=result?.nextPageToken||'';
-      if(all.length>12000)throw Error('Volume de dados acima do limite de leitura. Contate o administrador.');
-    }while(pageToken);
-    return all;
+    return queryCollection('barzinho/principal/'+key);
   }
   async function readProfile(user){
     if(databaseId){
@@ -205,7 +254,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       return e.name==='AbortError'?'tempo esgotado':String(e.message||e);
     }finally{clearTimeout(timer)}
   }
-  async function diagnosePermissions(user,profile,serial){
+  async function diagnosePermissions(user,profile,serial,originalError){
     if(!user||!profile||!databaseId)return;
     const results=[
       ['Perfil por UID (GET)', 'users/'+encodeURIComponent(user.uid)],
@@ -239,17 +288,14 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
         +'Perfil informado: active='+String(profile.active)+', role='+String(profile.role)+'\n'
         +readings.join('\n');
     }
-    const adminList=readings[1],itemGet=readings[3],itemList=readings[4];
-    if(adminList.includes('403')){
-      setMessage('loginStatus','Diagnóstico: até a listagem de usuários (admin) foi negada. As regras publicadas não estão reconhecendo a permissão de administrador. Veja os testes abaixo.');
-    }else if(itemList.includes('403') && (itemGet.includes('404')||itemGet.includes('200'))){
-      setMessage('loginStatus','Diagnóstico: a leitura individual do produto foi permitida, mas a LISTAGEM foi negada. Precisamos conferir a operação list nas regras publicadas deste banco.');
-    }else if(itemList.includes('403')){
-      setMessage('loginStatus','Diagnóstico: tanto a leitura quanto a listagem de produtos estão bloqueadas. Verifique a cobertura das regras no caminho barzinho/principal/products/{itemId}.');
-    }else if(readings.some(line=>line.includes('403'))){
-      setMessage('loginStatus','Diagnóstico: uma ou mais coleções foram negadas. Veja quais caminhos falharam abaixo.');
+    // listDocuments may fail while runQuery succeeds; do NOT misdiagnose
+    // this as a missing admin role.
+    const runUsers=queryResults[0],runProducts=queryResults[1];
+    const reason=humanError(originalError||new Error('Falha desconhecida'));
+    if(runUsers==='OK (200)' && runProducts==='OK (200)'){
+      setMessage('loginStatus','As consultas runQuery de usuários e produtos estão permitidas. Falhou uma etapa específica: '+reason+'. Veja os testes abaixo.');
     }else{
-      setMessage('loginStatus','Diagnóstico de permissões concluído. Veja os resultados por operação abaixo.');
+      setMessage('loginStatus','Falha ao carregar: '+reason+'. Consulte os resultados runQuery detalhados abaixo.');
     }
   }
 
@@ -423,7 +469,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       showAuthDiagnostics(user,verifiedProfile);
       showRetry('Não foi possível concluir o acesso: '+humanError(e)+' Analisando permissões de leitura...');
       if(verifiedProfile && databaseId) {
-        try { await diagnosePermissions(user,verifiedProfile,serial); }
+        try { await diagnosePermissions(user,verifiedProfile,serial,e); }
         catch(diagError){if(serial===authCheckSerial)setMessage('loginStatus','Diagnóstico não concluiu: '+humanError(diagError));}
       }
     }
@@ -450,16 +496,17 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     const table=field('usersTable');
     table.textContent='Carregando usuários...';
     try {
-      const snap=await getDocs(collection(firestore,'users'));
+      const accounts=await queryCollection('users');
       table.replaceChildren();
-      for(const account of snap.docs){
-        const u=account.data();
+      for(const account of accounts){
+        const id=account.name.split('/').pop();
+        const u=firestoreFields(account);
         const row=document.createElement('div');row.className='team-user-row';
         const identity=document.createElement('div');
         const name=document.createElement('strong');name.textContent=u.name||u.email||'Usuário';
         const info=document.createElement('small');info.textContent=(u.email||'')+' · '+(u.role==='admin'?'Administrador':'Equipe');
         identity.append(name,info);row.append(identity);
-        if(account.id===current.uid||u.role==='admin'){
+        if(id===current.uid||u.role==='admin'){
           const status=document.createElement('span');status.textContent='Administrador';row.append(status);
         } else {
           const action=document.createElement('button');
@@ -467,7 +514,7 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
           action.textContent=u.active===true?'Bloquear':'Reativar';
           action.addEventListener('click',async()=>{
             action.disabled=true;
-            try{await updateDoc(doc(firestore,'users',account.id),{active:u.active!==true,updatedAt:serverTimestamp()});
+            try{await updateDoc(doc(firestore,'users',id),{active:u.active!==true,updatedAt:serverTimestamp()});
               toast('Acesso atualizado.');await renderUsersAfterAction();
             }catch(e){toast('Erro: '+humanError(e));action.disabled=false;}
           });
