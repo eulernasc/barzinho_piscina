@@ -43,9 +43,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /barzinho/principal/{entity}/{itemId} {
-      allow read, write: if authorized()
-        && entity in ['products','sales','orders','movements','purchases','stockAdjustments'];
+    // Regras explícitas para listagem e gravação das seis subcoleções.
+    // Um usuário deve ter cadastro ativo para acessar qualquer item.
+    match /barzinho/principal/products/{itemId} {
+      allow get, list, create, update, delete: if authorized();
+    }
+    match /barzinho/principal/sales/{itemId} {
+      allow get, list, create, update, delete: if authorized();
+    }
+    match /barzinho/principal/orders/{itemId} {
+      allow get, list, create, update, delete: if authorized();
+    }
+    match /barzinho/principal/movements/{itemId} {
+      allow get, list, create, update, delete: if authorized();
+    }
+    match /barzinho/principal/purchases/{itemId} {
+      allow get, list, create, update, delete: if authorized();
+    }
+    match /barzinho/principal/stockAdjustments/{itemId} {
+      allow get, list, create, update, delete: if authorized();
     }
 
     // Everything else is denied by default, unless separately allowed by
