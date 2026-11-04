@@ -1,5 +1,5 @@
 import {initOperations,renderOperations} from './operations.js?v=20261104-auth1';
-import {startCloud} from './cloud.js?v=20261104-auth4';
+import {startCloud} from './cloud.js?v=20261104-auth5';
 const DB_KEY='barzinhoPiscinaDB_v1';
 const emptyDb=()=>({products:[],sales:[],movements:[],purchases:[],stockAdjustments:[],orders:[],orderCounter:1000});
 let db=emptyDb();let cart=[];let purchaseDraft=[];let cloudController=null;let operationsReady=false;let saleSaving=false;
