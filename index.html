@@ -8,7 +8,7 @@
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="operations.css?v=20261029-itens3">
-  <link rel="stylesheet" href="cloud.css?v=20261104-auth1">
+  <link rel="stylesheet" href="cloud.css?v=20261104-auth4">
 </head>
 <body>
   <main id="loginScreen" class="login-screen">
@@ -26,6 +26,11 @@
       <button id="googleLoginButton" class="google-login" type="button">Entrar com Google</button>
       <p id="loginStatus" role="status" aria-live="polite">Verificando configuração...</p>
       <button id="retryAuthButton" type="button" class="secondary" hidden>Tentar novamente</button>
+      <div id="authDiagnostics" class="auth-diagnostics" role="status" aria-live="polite" hidden></div>
+      <div class="login-diag-actions">
+        <button id="copyAuthDiagnostics" type="button" class="secondary" hidden>Copiar diagnóstico</button>
+        <button id="switchGoogleAccount" type="button" class="secondary" hidden>Trocar conta Google</button>
+      </div>
     </section>
   </main>
   <div id="appShell" class="app-shell" hidden>
@@ -188,7 +193,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="printArea" class="print-area"></div>
-  <script type="module" src="js/app.js?v=20261104-auth3"></script>
+  <script type="module" src="js/app.js?v=20261104-auth4"></script>
 </body>
 </html>
 
