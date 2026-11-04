@@ -110,6 +110,17 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       throw e;
     }finally{clearTimeout(timer);}
   }
+  async function restList(key){
+    const all=[];let pageToken='';
+    do{
+      const suffix='barzinho/principal/'+key+'?pageSize=300'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+      const result=await restGet(suffix,{allow404:true});
+      if(result?.documents)all.push(...result.documents);
+      pageToken=result?.nextPageToken||'';
+      if(all.length>12000)throw Error('Volume de dados acima do limite de leitura. Contate o administrador.');
+    }while(pageToken);
+    return all;
+  }
   async function readProfile(user){
     const record=await restGet('users/'+encodeURIComponent(user.uid),{allow404:true,ms:12000});
     return record?firestoreFields(record):null;
@@ -121,11 +132,11 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
       setMessage('syncState','Atualizando dados do bar...');
       const [meta,...snapshots]=await Promise.all([
         restGet('barzinho/principal',{allow404:true}),
-        ...entities.map(key=>restGet('barzinho/principal/'+key+'?pageSize=1000',{allow404:true}))
+        ...entities.map(key=>restList(key))
       ]);
       const next=emptyDb();
       entities.forEach((key,index)=>{
-        const docs=snapshots[index]?.documents||[];
+        const docs=snapshots[index]||[];
         next[key]=docs.map(d=>firestoreFields(d).value).filter(Boolean);
       });
       const metadata=meta?firestoreFields(meta):{};
@@ -222,14 +233,25 @@ export function startCloud({getDb,setDb,renderAll,authorized,revoked,toast}) {
     field('importLocalButton').hidden=record.role!=='admin';
     setMessage('syncState','Dados sincronizados com Firestore.');
     authorized(current);
-    unlistenMeta=onSnapshot(metaRef,snap=>{
-      if(!ready||saving)return;
-      const remote=Number(snap.data()?.revision||0);
-      if(remote!==revision) readCloud().catch(e=>setMessage('syncState','Falha na atualização: '+humanError(e)));
-    },e=>setMessage('syncState','Conexão de dados: '+humanError(e)));
-    unlistenRole=onSnapshot(doc(firestore,'users',user.uid),snap=>{
-      if(!snap.exists()||snap.data().active!==true) signOut(auth);
-    },()=>signOut(auth));
+    // Poll via authenticated REST because the SDK streaming channel is the
+    // reason the browser can hang; all operations still obey Firestore Rules.
+    let checking=false;
+    async function checkUpdates(){
+      if(!ready||saving||checking||!auth.currentUser)return;
+      checking=true;
+      try{
+        const profile=await readProfile(user);
+        if(!profile||profile.active!==true){await signOut(auth);return}
+        const meta=await restGet('barzinho/principal',{allow404:true});
+        const currentRevision=meta?Number(firestoreFields(meta).revision||0):0;
+        if(currentRevision!==revision)await readCloud();
+      }catch(e){
+        setMessage('syncState','Falha na sincronização: '+humanError(e));
+      }finally{checking=false}
+    }
+    const timer=setInterval(checkUpdates,12000);
+    unlistenMeta=()=>clearInterval(timer);
+    unlistenRole=()=>{};
   }
 
   function exit(){
